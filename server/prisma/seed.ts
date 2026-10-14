@@ -1,6 +1,16 @@
-import { PrismaClient, CostingMethodName } from '@prisma/client';
+import { PrismaClient, CostingMethodName, UserRole } from '@prisma/client';
+import * as argon2 from 'argon2';
 
 const prisma = new PrismaClient();
+
+async function hashPassword(plain: string): Promise<string> {
+  return argon2.hash(plain, {
+    type: argon2.argon2id,
+    memoryCost: 65536,
+    timeCost: 3,
+    parallelism: 4,
+  });
+}
 
 async function main() {
   console.log('Seeding initial system records...');
@@ -33,10 +43,57 @@ async function main() {
           activeCostingMethodId: defaultMethod.id,
         },
       });
-      console.log(`Initialized system_settings with default costing method: ${defaultMethod.name}`);
+      console.log(
+        `Initialized system_settings with default costing method: ${defaultMethod.name}`,
+      );
     } else {
       console.log('system_settings already exists, skipping creation.');
     }
+  }
+
+  // 3. Seed Default RBAC Users (ADMIN, SALES, AUDITOR)
+  const usersToSeed = [
+    {
+      name: 'System Administrator',
+      email: 'admin@inventory.local',
+      phone: '+251911000001',
+      role: UserRole.ADMIN,
+      password: 'AdminPassword123!',
+    },
+    {
+      name: 'Sales Manager',
+      email: 'sales@inventory.local',
+      phone: '+251911000002',
+      role: UserRole.SALES,
+      password: 'SalesPassword123!',
+    },
+    {
+      name: 'Compliance Auditor',
+      email: 'auditor@inventory.local',
+      phone: '+251911000003',
+      role: UserRole.AUDITOR,
+      password: 'AuditorPassword123!',
+    },
+  ];
+
+  for (const userData of usersToSeed) {
+    const hashedPassword = await hashPassword(userData.password);
+    const user = await prisma.user.upsert({
+      where: { email: userData.email },
+      update: {
+        role: userData.role,
+        isActive: true,
+      },
+      create: {
+        name: userData.name,
+        email: userData.email,
+        phone: userData.phone,
+        role: userData.role,
+        isActive: true,
+        password: hashedPassword,
+      },
+    });
+    console.log(`Seeded user: ${user.email} (${user.role})`);
   }
 
   console.log('Seeding completed successfully.');
