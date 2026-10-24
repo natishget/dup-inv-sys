@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Get,
+  Patch,
   Body,
   Req,
   Res,
@@ -15,6 +16,8 @@ import { Throttle } from '@nestjs/throttler';
 import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 import { AuthResponseDto, RefreshResponseDto } from './dto/auth-response.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { Public } from './decorators/public.decorator';
@@ -111,5 +114,35 @@ export class AuthController {
   @Get('me')
   getProfile(@CurrentUser() user: SafeUser): SafeUser {
     return user;
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('profile')
+  async updateProfile(
+    @CurrentUser('id') userId: string,
+    @Body() updateProfileDto: UpdateProfileDto,
+  ): Promise<SafeUser> {
+    return this.authService.updateProfile(userId, updateProfileDto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('change-password')
+  @HttpCode(HttpStatus.OK)
+  async changePassword(
+    @CurrentUser('id') userId: string,
+    @Body() changePasswordDto: ChangePasswordDto,
+    @Res({ passthrough: true }) res: express.Response,
+  ): Promise<{ message: string }> {
+    const result = await this.authService.changePassword(userId, changePasswordDto);
+
+    // Invalidate refresh cookie on password change to force fresh authentication
+    res.clearCookie(this.refreshCookieName, {
+      httpOnly: true,
+      secure: this.isProduction,
+      sameSite: this.isProduction ? 'strict' : 'lax',
+      path: '/',
+    });
+
+    return result;
   }
 }

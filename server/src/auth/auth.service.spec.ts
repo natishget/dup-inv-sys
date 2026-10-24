@@ -265,4 +265,66 @@ describe('AuthService', () => {
       );
     });
   });
+
+  describe('updateProfile', () => {
+    it('should update name and phone cleanly', async () => {
+      mockPrismaService.user.findUnique
+        .mockResolvedValueOnce(mockUser)
+        .mockResolvedValueOnce(null);
+      mockPrismaService.user.update.mockResolvedValue({
+        ...mockUser,
+        name: 'New Name',
+        phone: '+251999999999',
+      });
+
+      const updated = await service.updateProfile(mockUser.id, {
+        name: 'New Name',
+        phone: '+251999999999',
+      });
+
+      expect(updated.name).toBe('New Name');
+      expect(updated.phone).toBe('+251999999999');
+    });
+  });
+
+  describe('changePassword', () => {
+    it('should change password and clear rememberToken', async () => {
+      const initialHash = await service.hashPassword('OldPass123!');
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        ...mockUser,
+        password: initialHash,
+      });
+      mockPrismaService.user.update.mockResolvedValue(mockUser);
+
+      const result = await service.changePassword(mockUser.id, {
+        currentPassword: 'OldPass123!',
+        newPassword: 'NewPassword999!',
+      });
+
+      expect(result.message).toBe('Password successfully updated');
+      expect(mockPrismaService.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: mockUser.id },
+          data: expect.objectContaining({
+            rememberToken: null,
+          }),
+        }),
+      );
+    });
+
+    it('should throw UnauthorizedException if current password does not match', async () => {
+      const initialHash = await service.hashPassword('OldPass123!');
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        ...mockUser,
+        password: initialHash,
+      });
+
+      await expect(
+        service.changePassword(mockUser.id, {
+          currentPassword: 'WrongPassword!',
+          newPassword: 'NewPassword999!',
+        }),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+  });
 });

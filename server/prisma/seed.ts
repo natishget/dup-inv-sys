@@ -54,6 +54,13 @@ async function main() {
   // 3. Seed Default RBAC Users (ADMIN, SALES, AUDITOR)
   const usersToSeed = [
     {
+      name: 'Natnael Getachew',
+      email: 'natishget@gmail.com',
+      phone: '+251911000000',
+      role: UserRole.ADMIN,
+      password: 'AdminPassword123!',
+    },
+    {
       name: 'System Administrator',
       email: 'admin@inventory.local',
       phone: '+251911000001',

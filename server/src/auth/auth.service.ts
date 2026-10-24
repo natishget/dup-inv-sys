@@ -1,6 +1,8 @@
 import {
   Injectable,
   UnauthorizedException,
+  BadRequestException,
+  ConflictException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -8,6 +10,8 @@ import * as argon2 from 'argon2';
 import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 import {
   JwtPayload,
   JwtRefreshPayload,
@@ -240,6 +244,98 @@ export class AuthService {
     }
 
     return this.sanitizeUser(user);
+  }
+
+  /**
+   * Updates an authenticated operator's personal profile (name, email, phone).
+   */
+  async updateProfile(
+    userId: string,
+    dto: UpdateProfileDto,
+  ): Promise<SafeUser> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    if (!user.isActive) {
+      throw new UnauthorizedException('User account has been deactivated');
+    }
+
+    if (dto.email && dto.email !== user.email) {
+      const existingEmail = await this.prisma.user.findUnique({
+        where: { email: dto.email },
+      });
+      if (existingEmail) {
+        throw new ConflictException('Email is already registered by another user');
+      }
+    }
+
+    if (dto.phone && dto.phone !== user.phone) {
+      const existingPhone = await this.prisma.user.findUnique({
+        where: { phone: dto.phone },
+      });
+      if (existingPhone) {
+        throw new ConflictException('Phone number is already registered by another user');
+      }
+    }
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(dto.name ? { name: dto.name.trim() } : {}),
+        ...(dto.email ? { email: dto.email.trim().toLowerCase() } : {}),
+        ...(dto.phone ? { phone: dto.phone.trim() } : {}),
+      },
+    });
+
+    return this.sanitizeUser(updatedUser);
+  }
+
+  /**
+   * Authenticates current password and updates to a newly hashed password.
+   * Clears the refresh token session to force re-authentication across devices.
+   */
+  async changePassword(
+    userId: string,
+    dto: ChangePasswordDto,
+  ): Promise<{ message: string }> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const isCurrentValid = await this.verifyPassword(
+      user.password,
+      dto.currentPassword,
+    );
+    if (!isCurrentValid) {
+      throw new UnauthorizedException('Current password is incorrect');
+    }
+
+    if (dto.currentPassword === dto.newPassword) {
+      throw new BadRequestException(
+        'New password must be different from current password',
+      );
+    }
+
+    const hashedPassword = await this.hashPassword(dto.newPassword);
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        password: hashedPassword,
+        rememberToken: null,
+      },
+    });
+
+    return { message: 'Password successfully updated' };
   }
 
   /**

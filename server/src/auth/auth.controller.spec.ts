@@ -26,6 +26,8 @@ describe('AuthController', () => {
     refreshTokens: jest.fn(),
     logout: jest.fn(),
     getProfile: jest.fn(),
+    updateProfile: jest.fn(),
+    changePassword: jest.fn(),
   };
 
   const mockConfigService = {
@@ -145,6 +147,40 @@ describe('AuthController', () => {
     it('should return current user profile', () => {
       const profile = controller.getProfile(mockSafeUser);
       expect(profile).toBe(mockSafeUser);
+    });
+  });
+
+  describe('updateProfile', () => {
+    it('should call authService.updateProfile', async () => {
+      mockAuthService.updateProfile.mockResolvedValue(mockSafeUser);
+
+      const result = await controller.updateProfile('user-uuid-1', { name: 'New Name' });
+      expect(result).toBe(mockSafeUser);
+      expect(mockAuthService.updateProfile).toHaveBeenCalledWith('user-uuid-1', {
+        name: 'New Name',
+      });
+    });
+  });
+
+  describe('changePassword', () => {
+    it('should call authService.changePassword and clear cookie', async () => {
+      mockAuthService.changePassword.mockResolvedValue({ message: 'Success' });
+      const mockResponse: any = { clearCookie: jest.fn() };
+
+      const result = await controller.changePassword(
+        'user-uuid-1',
+        { currentPassword: 'Old', newPassword: 'NewPassword123!' },
+        mockResponse,
+      );
+
+      expect(result).toEqual({ message: 'Success' });
+      expect(mockResponse.clearCookie).toHaveBeenCalledWith(
+        'refresh_token',
+        expect.objectContaining({
+          httpOnly: true,
+          path: '/',
+        }),
+      );
     });
   });
 });
