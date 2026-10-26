@@ -11,8 +11,11 @@ import { UpdateWarehouseDto } from './dto/update-warehouse.dto';
 export interface WarehouseStockItem {
   variant_id: string;
   product_name: string;
+  sku: string | null;
   color: string | null;
   origin: string | null;
+  thickness: string | null;
+  size: string | null;
   total_stock: number;
 }
 
@@ -32,7 +35,9 @@ export class WarehousesService {
   /**
    * Creates a new warehouse facility.
    */
-  async create(dto: CreateWarehouseDto): Promise<{ data: Warehouse; message: string }> {
+  async create(
+    dto: CreateWarehouseDto,
+  ): Promise<{ data: Warehouse; message: string }> {
     const warehouse = await this.prisma.warehouse.create({
       data: {
         name: dto.name.trim(),
@@ -62,7 +67,8 @@ export class WarehousesService {
 
     const updateData: Prisma.WarehouseUpdateInput = {};
     if (dto.name !== undefined) updateData.name = dto.name.trim();
-    if (dto.location !== undefined) updateData.location = dto.location?.trim() || null;
+    if (dto.location !== undefined)
+      updateData.location = dto.location?.trim() || null;
 
     const updated = await this.prisma.warehouse.update({
       where: { id },
@@ -125,22 +131,28 @@ export class WarehousesService {
       Array<{
         variant_id: string;
         product_name: string;
+        sku: string | null;
         color: string | null;
         origin: string | null;
+        thickness: string | null;
+        size: string | null;
         total_stock: string; // Prisma returns DECIMAL as string from raw queries
       }>
     >`
       SELECT
         pv.id           AS variant_id,
         p.name          AS product_name,
+        pv.sku          AS sku,
         pv.color        AS color,
         pv.origin::TEXT AS origin,
+        pv.thickness::TEXT AS thickness,
+        pv.size         AS size,
         SUM(it.quantity)::NUMERIC AS total_stock
       FROM inventory_transactions it
       INNER JOIN product_variants pv ON pv.id = it.variant_id
       INNER JOIN products p          ON p.id  = pv.product_id
       WHERE it.warehouse_id = ${id}::UUID
-      GROUP BY pv.id, p.name, pv.color, pv.origin
+      GROUP BY pv.id, p.name, pv.sku, pv.color, pv.origin, pv.thickness, pv.size
       HAVING SUM(it.quantity) != 0
       ORDER BY p.name ASC, pv.color ASC
     `;
@@ -149,8 +161,11 @@ export class WarehousesService {
       data: rows.map((row) => ({
         variant_id: row.variant_id,
         product_name: row.product_name,
+        sku: row.sku,
         color: row.color,
         origin: row.origin,
+        thickness: row.thickness,
+        size: row.size,
         total_stock: parseFloat(row.total_stock),
       })),
     };
