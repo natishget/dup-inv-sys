@@ -48,12 +48,10 @@ function RotateCcwIcon(props: React.SVGProps<SVGSVGElement>) {
 const fmt = (n: string | null | undefined) =>
   n ? Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '0.00';
 
-const today = () => new Date().toISOString().slice(0, 10);
-
 const emptyCreateForm = (): CreatePurchaseForm => ({
   supplierName: '',
   invoiceNumber: '',
-  purchaseDate: today(),
+  purchaseDate: '',
   warehouseId: '',
   notes: '',
   items: [{ variantId: '', quantity: '', unitCost: '' }],
@@ -61,7 +59,7 @@ const emptyCreateForm = (): CreatePurchaseForm => ({
 
 const emptyReturnForm = (): CreateReturnForm => ({
   warehouseId: '',
-  returnDate: today(),
+  returnDate: '',
   notes: '',
   items: [{ variantId: '', quantity: '' }],
 });
@@ -124,6 +122,10 @@ export default function PurchasesPage() {
 
   // ── Load dropdown data once ────────────────────────────────────────────────
   useEffect(() => {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    setCreateForm((prev) => ({ ...prev, purchaseDate: prev.purchaseDate || todayStr }));
+    setReturnForm((prev) => ({ ...prev, returnDate: prev.returnDate || todayStr }));
+
     api.get<WarehouseListResponse>('/warehouses').then((r) => setWarehouses(r.data)).catch(() => {});
     api.get<{ data: { id: string; sku: string | null; color: string | null; origin: string | null; product: { name: string } | null }[] }>('/products/variants?limit=500')
       .then((r) => {
