@@ -7,8 +7,11 @@ export interface Warehouse {
 export interface WarehouseStockItem {
   variant_id: string;
   product_name: string;
+  sku: string | null;
   color: string | null;
   origin: 'LOCAL' | 'IMPORTED' | null;
+  thickness: string | null;
+  size: string | null;
   total_stock: number;
 }
 
