@@ -72,7 +72,7 @@ interface VariantOption {
 }
 
 export default function PurchasesPage() {
-  const { user } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const canMutate = user?.role === 'ADMIN' || user?.role === 'SALES';
 
   // ── List state ─────────────────────────────────────────────────────────────
@@ -122,9 +122,7 @@ export default function PurchasesPage() {
 
   // ── Load dropdown data once ────────────────────────────────────────────────
   useEffect(() => {
-    const todayStr = new Date().toISOString().slice(0, 10);
-    setCreateForm((prev) => ({ ...prev, purchaseDate: prev.purchaseDate || todayStr }));
-    setReturnForm((prev) => ({ ...prev, returnDate: prev.returnDate || todayStr }));
+    if (authLoading || !isAuthenticated) return;
 
     api.get<WarehouseListResponse>('/warehouses').then((r) => setWarehouses(r.data)).catch(() => {});
     api.get<{ data: { id: string; sku: string | null; color: string | null; origin: string | null; product: { name: string } | null }[] }>('/products/variants?limit=500')
@@ -138,10 +136,11 @@ export default function PurchasesPage() {
         );
       })
       .catch(() => {});
-  }, []);
+  }, [authLoading, isAuthenticated]);
 
   // ── Load purchases ─────────────────────────────────────────────────────────
   useEffect(() => {
+    if (authLoading || !isAuthenticated) return;
     let cancelled = false;
     setIsLoading(true);
     const params = new URLSearchParams();
@@ -164,7 +163,7 @@ export default function PurchasesPage() {
       })
       .finally(() => { if (!cancelled) setIsLoading(false); });
     return () => { cancelled = true; };
-  }, [page, searchSupplier, filterStatus, filterDate, filterOrder, refreshTrigger]);
+  }, [page, searchSupplier, filterStatus, filterDate, filterOrder, refreshTrigger, authLoading, isAuthenticated]);
 
   // ── Apply / Reset filters ──────────────────────────────────────────────────
   const handleApply = () => {
@@ -274,6 +273,7 @@ export default function PurchasesPage() {
   const openReturn = (p: Purchase) => {
     setReturnTarget(p);
     const form = emptyReturnForm();
+    form.returnDate = new Date().toISOString().slice(0, 10);
     if (warehouses.length > 0) form.warehouseId = warehouses[0].id;
     if (p.items.length > 0 && p.items[0].variantId) {
       form.items = [{ variantId: p.items[0].variantId, quantity: '' }];
@@ -371,7 +371,13 @@ export default function PurchasesPage() {
           {canMutate && (
             <button
               id="btn-make-purchase"
-              onClick={() => { setCreateForm(emptyCreateForm()); setIsCreateOpen(true); }}
+              onClick={() => {
+                setCreateForm({
+                  ...emptyCreateForm(),
+                  purchaseDate: new Date().toISOString().slice(0, 10),
+                });
+                setIsCreateOpen(true);
+              }}
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white text-sm font-semibold shadow-sm transition-all cursor-pointer whitespace-nowrap self-start"
             >
               <PlusIcon className="w-4 h-4" />

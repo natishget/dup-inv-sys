@@ -42,7 +42,7 @@ function formatThickness(val: string | number | null): string {
 }
 
 export default function ProductsPage() {
-  const { user } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
 
   // Variant table state
@@ -115,6 +115,7 @@ export default function ProductsPage() {
 
   // Fetch Master Products (for variant modal selection)
   useEffect(() => {
+    if (authLoading || !isAuthenticated) return;
     let active = true;
     async function loadMasterProducts() {
       try {
@@ -130,10 +131,11 @@ export default function ProductsPage() {
     return () => {
       active = false;
     };
-  }, [refreshTrigger]);
+  }, [refreshTrigger, authLoading, isAuthenticated]);
 
   // Fetch Distinct Colors for filter dropdown
   useEffect(() => {
+    if (authLoading || !isAuthenticated) return;
     let active = true;
     async function loadColors() {
       try {
@@ -149,10 +151,11 @@ export default function ProductsPage() {
     return () => {
       active = false;
     };
-  }, [refreshTrigger]);
+  }, [refreshTrigger, authLoading, isAuthenticated]);
 
   // Fetch Paginated Variants with applied filters
   useEffect(() => {
+    if (authLoading || !isAuthenticated) return;
     let active = true;
     async function loadVariants() {
       setIsLoading(true);
@@ -189,7 +192,7 @@ export default function ProductsPage() {
     return () => {
       active = false;
     };
-  }, [page, limit, appliedSearch, appliedOrigin, appliedColor, refreshTrigger]);
+  }, [page, limit, appliedSearch, appliedOrigin, appliedColor, refreshTrigger, authLoading, isAuthenticated]);
 
   // Handle Apply Filter
   const handleApplyFilter = (e?: React.FormEvent) => {
@@ -537,25 +540,25 @@ export default function ProductsPage() {
         )}
 
         {/* Main Card Container */}
-        <div className="rounded-2xl border border-zinc-800 bg-[#0c0c0e] shadow-xl overflow-hidden">
+        <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#0c0c0e] shadow-sm overflow-hidden">
           {/* Header & Action Buttons */}
-          <div className="p-6 md:p-8 border-b border-zinc-800/80 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="p-4 sm:p-6 md:p-8 border-b border-zinc-200 dark:border-zinc-800/80 flex flex-col md:flex-row md:items-center justify-between gap-4 sm:gap-6">
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-white">
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">
                 Product Management
               </h1>
-              <p className="text-sm text-zinc-400 mt-1">
+              <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 mt-1">
                 Manage products, create variants, and review every variant as its own
                 table row.
               </p>
             </div>
 
             {isAdmin && (
-              <div className="flex flex-wrap items-center gap-2.5">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
                 <button
                   id="add-product-btn"
                   onClick={() => setIsAddProductOpen(true)}
-                  className="bg-white hover:bg-zinc-200 text-zinc-950 font-semibold text-xs md:text-sm px-4 py-2 rounded-lg transition-colors shadow-sm"
+                  className="bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white font-semibold text-xs md:text-sm px-3.5 sm:px-4 py-2 rounded-lg transition-colors shadow-sm cursor-pointer"
                 >
                   Add Product
                 </button>
@@ -572,14 +575,14 @@ export default function ProductsPage() {
                     });
                     setIsAddVariantOpen(true);
                   }}
-                  className="bg-zinc-800/90 hover:bg-zinc-700 text-zinc-200 font-medium text-xs md:text-sm px-4 py-2 rounded-lg border border-zinc-700/60 transition-colors"
+                  className="bg-white dark:bg-zinc-800/90 hover:bg-zinc-50 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 font-medium text-xs md:text-sm px-3.5 sm:px-4 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700/60 transition-colors shadow-2xs cursor-pointer"
                 >
                   Add Product Variant
                 </button>
                 <button
                   id="import-json-btn"
                   onClick={() => setIsImportJsonOpen(true)}
-                  className="bg-zinc-800/90 hover:bg-zinc-700 text-zinc-200 font-medium text-xs md:text-sm px-4 py-2 rounded-lg border border-zinc-700/60 transition-colors"
+                  className="bg-white dark:bg-zinc-800/90 hover:bg-zinc-50 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 font-medium text-xs md:text-sm px-3.5 sm:px-4 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700/60 transition-colors shadow-2xs cursor-pointer"
                 >
                   Import JSON
                 </button>
@@ -590,25 +593,25 @@ export default function ProductsPage() {
           {/* Filter Bar */}
           <form
             onSubmit={handleApplyFilter}
-            className="p-6 border-b border-zinc-800/60 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4 items-end"
+            className="p-4 sm:p-6 border-b border-zinc-200 dark:border-zinc-800/60 bg-zinc-50/50 dark:bg-transparent grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 sm:gap-4 items-end"
           >
             {/* Search Input */}
             <div className="lg:col-span-5">
               <label
                 htmlFor="search-variants"
-                className="block text-xs font-medium text-zinc-300 mb-1.5"
+                className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5"
               >
                 Search by product or SKU
               </label>
               <div className="relative">
-                <SearchIcon className="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                <SearchIcon className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   id="search-variants"
                   type="text"
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
                   placeholder="Search variants"
-                  className="w-full pl-9 pr-3 py-2 bg-zinc-900/90 border border-zinc-800 rounded-lg text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-zinc-600 transition-colors"
+                  className="w-full pl-9 pr-3 py-2 bg-white dark:bg-zinc-900/90 border border-zinc-300 dark:border-zinc-800 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:border-zinc-500 dark:focus:border-zinc-600 transition-colors"
                 />
               </div>
             </div>
@@ -617,7 +620,7 @@ export default function ProductsPage() {
             <div className="lg:col-span-3">
               <label
                 htmlFor="origin-filter"
-                className="block text-xs font-medium text-zinc-300 mb-1.5"
+                className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5"
               >
                 Origin
               </label>
@@ -627,7 +630,7 @@ export default function ProductsPage() {
                 onChange={(e) =>
                   setOriginFilter(e.target.value as 'ALL' | ProductOrigin)
                 }
-                className="w-full px-3 py-2 bg-zinc-900/90 border border-zinc-800 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-zinc-600 transition-colors"
+                className="w-full px-3 py-2 bg-white dark:bg-zinc-900/90 border border-zinc-300 dark:border-zinc-800 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-500 dark:focus:border-zinc-600 transition-colors"
               >
                 <option value="ALL">All origins</option>
                 <option value="LOCAL">LOCAL</option>
@@ -639,7 +642,7 @@ export default function ProductsPage() {
             <div className="lg:col-span-2">
               <label
                 htmlFor="color-filter"
-                className="block text-xs font-medium text-zinc-300 mb-1.5"
+                className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5"
               >
                 Color
               </label>
@@ -647,7 +650,7 @@ export default function ProductsPage() {
                 id="color-filter"
                 value={colorFilter}
                 onChange={(e) => setColorFilter(e.target.value)}
-                className="w-full px-3 py-2 bg-zinc-900/90 border border-zinc-800 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-zinc-600 transition-colors"
+                className="w-full px-3 py-2 bg-white dark:bg-zinc-900/90 border border-zinc-300 dark:border-zinc-800 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-500 dark:focus:border-zinc-600 transition-colors"
               >
                 <option value="ALL">All colors</option>
                 {colorOptions.map((c) => (
@@ -663,7 +666,7 @@ export default function ProductsPage() {
               <button
                 type="submit"
                 id="apply-filter-btn"
-                className="flex-1 bg-zinc-200 hover:bg-white text-zinc-950 text-xs font-semibold px-4 py-2 rounded-lg h-[38px] transition-colors"
+                className="flex-1 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-200 dark:hover:bg-white dark:text-zinc-950 text-xs font-semibold px-4 py-2 rounded-lg h-[38px] transition-colors cursor-pointer"
               >
                 Apply
               </button>
@@ -671,7 +674,7 @@ export default function ProductsPage() {
                 type="button"
                 id="reset-filter-btn"
                 onClick={handleResetFilter}
-                className="text-zinc-400 hover:text-zinc-200 text-xs font-medium px-3 py-2 h-[38px] transition-colors"
+                className="text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 text-xs font-medium px-3 py-2 h-[38px] transition-colors cursor-pointer"
               >
                 Reset
               </button>
@@ -680,21 +683,21 @@ export default function ProductsPage() {
 
           {/* Variants Data Table */}
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm border-collapse">
+            <table className="w-full text-left text-sm border-collapse min-w-[720px]">
               <thead>
-                <tr className="border-b border-zinc-800/80 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">
-                  <th className="py-3 px-6">Product</th>
-                  <th className="py-3 px-4">Base Unit</th>
-                  <th className="py-3 px-4">Origin</th>
-                  <th className="py-3 px-4">Color</th>
-                  <th className="py-3 px-4">SKU</th>
-                  <th className="py-3 px-4">Thickness</th>
-                  <th className="py-3 px-4">Size</th>
-                  <th className="py-3 px-4">Created</th>
-                  {isAdmin && <th className="py-3 px-4 text-right">Actions</th>}
+                <tr className="border-b border-zinc-200 dark:border-zinc-800/80 text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider bg-zinc-50/80 dark:bg-zinc-900/40">
+                  <th className="py-3.5 px-6">Product</th>
+                  <th className="py-3.5 px-4">Base Unit</th>
+                  <th className="py-3.5 px-4">Origin</th>
+                  <th className="py-3.5 px-4">Color</th>
+                  <th className="py-3.5 px-4">SKU</th>
+                  <th className="py-3.5 px-4">Thickness</th>
+                  <th className="py-3.5 px-4">Size</th>
+                  <th className="py-3.5 px-4">Created</th>
+                  {isAdmin && <th className="py-3.5 px-4 text-right">Actions</th>}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-800/40">
+              <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800/40">
                 {isLoading ? (
                   <tr>
                     <td
@@ -722,60 +725,60 @@ export default function ProductsPage() {
                     return (
                       <tr
                         key={v.id}
-                        className="hover:bg-zinc-800/25 transition-colors group"
+                        className="hover:bg-zinc-50/80 dark:hover:bg-zinc-800/25 transition-colors group"
                       >
                         {/* Product Family Name & Variant ID */}
                         <td className="py-4 px-6">
-                          <div className="font-semibold text-zinc-100 text-sm">
+                          <div className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm">
                             {v.product?.name || 'Unnamed Product'}
                           </div>
-                          <div className="text-[11px] text-zinc-500 font-mono mt-0.5">
+                          <div className="text-[11px] text-zinc-400 dark:text-zinc-500 font-mono mt-0.5">
                             Variant ID: {v.id}
                           </div>
                         </td>
 
                         {/* Base Unit */}
-                        <td className="py-4 px-4 text-zinc-300 text-sm">
+                        <td className="py-4 px-4 text-zinc-700 dark:text-zinc-300 text-sm">
                           {v.product?.baseUnit || '-'}
                         </td>
 
                         {/* Origin Badge */}
                         <td className="py-4 px-4">
                           {v.origin === 'IMPORTED' ? (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold tracking-wider border border-zinc-700 bg-zinc-900/90 text-zinc-300">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold tracking-wider border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-900/90 text-zinc-700 dark:text-zinc-300">
                               IMPORTED
                             </span>
                           ) : v.origin === 'LOCAL' ? (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold tracking-wider border border-zinc-800 bg-zinc-900/60 text-zinc-400">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold tracking-wider border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/60 text-zinc-600 dark:text-zinc-400">
                               LOCAL
                             </span>
                           ) : (
-                            <span className="text-zinc-600 text-xs">-</span>
+                            <span className="text-zinc-400 dark:text-zinc-600 text-xs">-</span>
                           )}
                         </td>
 
                         {/* Color */}
-                        <td className="py-4 px-4 text-zinc-300 text-sm capitalize">
+                        <td className="py-4 px-4 text-zinc-700 dark:text-zinc-300 text-sm capitalize">
                           {v.color || '-'}
                         </td>
 
                         {/* SKU */}
-                        <td className="py-4 px-4 text-zinc-300 font-mono text-xs">
+                        <td className="py-4 px-4 text-zinc-800 dark:text-zinc-300 font-mono text-xs">
                           {v.sku || '-'}
                         </td>
 
                         {/* Thickness */}
-                        <td className="py-4 px-4 text-zinc-300 text-sm">
+                        <td className="py-4 px-4 text-zinc-700 dark:text-zinc-300 text-sm">
                           {formatThickness(v.thickness)}
                         </td>
 
                         {/* Size */}
-                        <td className="py-4 px-4 text-zinc-300 text-sm">
+                        <td className="py-4 px-4 text-zinc-700 dark:text-zinc-300 text-sm">
                           {v.size || '0'}
                         </td>
 
                         {/* Created Date */}
-                        <td className="py-4 px-4 text-zinc-400 text-xs whitespace-nowrap">
+                        <td className="py-4 px-4 text-zinc-500 dark:text-zinc-400 text-xs whitespace-nowrap">
                           {formatDate(v.createdAt)}
                         </td>
 
@@ -788,7 +791,7 @@ export default function ProductsPage() {
                                 e.stopPropagation();
                                 setActiveMenuId(isMenuOpen ? null : v.id);
                               }}
-                              className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/80 transition-colors"
+                              className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/80 transition-colors cursor-pointer"
                               title="Row actions"
                             >
                               <MoreVerticalIcon className="w-4 h-4" />
@@ -798,7 +801,7 @@ export default function ProductsPage() {
                             {isMenuOpen && (
                               <div
                                 onClick={(e) => e.stopPropagation()}
-                                className="absolute right-6 top-10 w-48 bg-[#141418] border border-zinc-800 rounded-xl shadow-2xl py-1.5 z-30 text-left"
+                                className="absolute right-6 top-10 w-48 bg-white dark:bg-[#141418] border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl py-1.5 z-30 text-left"
                               >
                                 <button
                                   type="button"
@@ -806,7 +809,7 @@ export default function ProductsPage() {
                                     setActiveMenuId(null);
                                     openEditVariant(v);
                                   }}
-                                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-zinc-300 hover:text-white hover:bg-zinc-800/60 transition-colors"
+                                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800/60 transition-colors cursor-pointer"
                                 >
                                   <EditIcon className="w-3.5 h-3.5 text-zinc-400" />
                                   <span>Edit Variant</span>
@@ -817,14 +820,14 @@ export default function ProductsPage() {
                                     setActiveMenuId(null);
                                     handleDeleteVariant(v);
                                   }}
-                                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-red-400 hover:text-red-300 hover:bg-red-950/20 transition-colors"
+                                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors cursor-pointer"
                                 >
                                   <Trash2Icon className="w-3.5 h-3.5" />
                                   <span>Delete Variant</span>
                                 </button>
                                 {v.product && (
                                   <>
-                                    <div className="h-px bg-zinc-800 my-1" />
+                                    <div className="h-px bg-zinc-100 dark:bg-zinc-800 my-1" />
                                     <button
                                       type="button"
                                       onClick={() => {
@@ -834,7 +837,7 @@ export default function ProductsPage() {
                                           v.product!.name,
                                         );
                                       }}
-                                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 transition-colors"
+                                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 transition-colors cursor-pointer"
                                     >
                                       <span>Delete Master Product</span>
                                     </button>
@@ -853,7 +856,7 @@ export default function ProductsPage() {
           </div>
 
           {/* Pagination Footer */}
-          <div className="p-4 md:px-6 border-t border-zinc-800/80 flex items-center justify-between text-xs text-zinc-400">
+          <div className="p-4 md:px-6 border-t border-zinc-200 dark:border-zinc-800/80 bg-zinc-50/60 dark:bg-transparent flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
             <div>
               Showing {startItemIndex}-{endItemIndex} of {totalVariants}
             </div>
@@ -864,7 +867,7 @@ export default function ProductsPage() {
                 id="prev-page-btn"
                 disabled={page <= 1 || isLoading}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="px-3 py-1.5 rounded-lg border border-zinc-800 hover:bg-zinc-800/60 disabled:opacity-40 disabled:cursor-not-allowed text-zinc-300 transition-colors"
+                className="px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/60 disabled:opacity-40 disabled:cursor-not-allowed text-zinc-700 dark:text-zinc-300 transition-colors cursor-pointer"
               >
                 Previous
               </button>
@@ -873,7 +876,7 @@ export default function ProductsPage() {
                 id="next-page-btn"
                 disabled={page >= totalPages || isLoading}
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                className="px-3 py-1.5 rounded-lg border border-zinc-800 hover:bg-zinc-800/60 disabled:opacity-40 disabled:cursor-not-allowed text-zinc-300 transition-colors"
+                className="px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/60 disabled:opacity-40 disabled:cursor-not-allowed text-zinc-700 dark:text-zinc-300 transition-colors cursor-pointer"
               >
                 Next
               </button>
@@ -882,25 +885,25 @@ export default function ProductsPage() {
         </div>
       </div>
 
-      {/* MODAL 1: Add New Product (matches Image 3) */}
+      {/* MODAL 1: Add New Product */}
       {isAddProductOpen && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0e0e11] border border-zinc-800 rounded-2xl p-6 w-full max-w-md shadow-2xl relative">
+        <div className="fixed inset-0 bg-black/60 dark:bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#0e0e11] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 w-full max-w-md shadow-2xl relative max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => setIsAddProductOpen(false)}
-              className="absolute top-5 right-5 text-zinc-400 hover:text-white transition-colors"
+              className="absolute top-5 right-5 text-zinc-400 hover:text-zinc-700 dark:hover:text-white transition-colors cursor-pointer"
             >
               <XIcon className="w-5 h-5" />
             </button>
 
-            <h2 className="text-lg font-semibold text-zinc-100">Add New Product</h2>
-            <p className="text-xs text-zinc-400 mt-1">
+            <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Add New Product</h2>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
               Create a new product record.
             </p>
 
             <form onSubmit={handleCreateProduct} className="mt-5 space-y-4">
               <div>
-                <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
                   Name
                 </label>
                 <input
@@ -912,12 +915,12 @@ export default function ProductsPage() {
                   onChange={(e) =>
                     setProductForm((prev) => ({ ...prev, name: e.target.value }))
                   }
-                  className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-zinc-500 transition-colors"
+                  className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:border-zinc-500 transition-colors"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
                   Base Unit
                 </label>
                 <input
@@ -928,7 +931,7 @@ export default function ProductsPage() {
                   onChange={(e) =>
                     setProductForm((prev) => ({ ...prev, baseUnit: e.target.value }))
                   }
-                  className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-zinc-500 transition-colors"
+                  className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:border-zinc-500 transition-colors"
                 />
               </div>
 
@@ -936,14 +939,14 @@ export default function ProductsPage() {
                 <button
                   type="button"
                   onClick={() => setIsAddProductOpen(false)}
-                  className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-4 py-2 rounded-lg text-xs md:text-sm font-medium transition-colors"
+                  className="bg-zinc-100 hover:bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-300 px-4 py-2 rounded-lg text-xs md:text-sm font-medium transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   id="save-product-submit-btn"
-                  className="bg-white hover:bg-zinc-200 text-zinc-950 font-semibold px-4 py-2 rounded-lg text-xs md:text-sm transition-colors shadow-sm"
+                  className="bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-zinc-950 font-semibold px-4 py-2 rounded-lg text-xs md:text-sm transition-colors shadow-sm cursor-pointer"
                 >
                   Save Product
                 </button>
@@ -953,28 +956,28 @@ export default function ProductsPage() {
         </div>
       )}
 
-      {/* MODAL 2: Add Product Variant (matches Image 2) */}
+      {/* MODAL 2: Add Product Variant */}
       {isAddVariantOpen && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0e0e11] border border-zinc-800 rounded-2xl p-6 w-full max-w-lg shadow-2xl relative">
+        <div className="fixed inset-0 bg-black/60 dark:bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#0e0e11] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 w-full max-w-lg shadow-2xl relative max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => setIsAddVariantOpen(false)}
-              className="absolute top-5 right-5 text-zinc-400 hover:text-white transition-colors"
+              className="absolute top-5 right-5 text-zinc-400 hover:text-zinc-700 dark:hover:text-white transition-colors cursor-pointer"
             >
               <XIcon className="w-5 h-5" />
             </button>
 
-            <h2 className="text-lg font-semibold text-zinc-100">
+            <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
               Add Product Variant
             </h2>
-            <p className="text-xs text-zinc-400 mt-1">
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
               Select a product and define the variant details.
             </p>
 
             <form onSubmit={handleCreateVariant} className="mt-5 space-y-4">
               {/* Product Select */}
               <div>
-                <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
                   Product
                 </label>
                 <select
@@ -984,7 +987,7 @@ export default function ProductsPage() {
                   onChange={(e) =>
                     setVariantForm((prev) => ({ ...prev, productId: e.target.value }))
                   }
-                  className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-zinc-500 transition-colors"
+                  className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-500 transition-colors"
                 >
                   <option value="" disabled>
                     Select product
@@ -999,7 +1002,7 @@ export default function ProductsPage() {
 
               {/* Origin Select */}
               <div>
-                <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
                   Origin
                 </label>
                 <select
@@ -1011,7 +1014,7 @@ export default function ProductsPage() {
                       origin: e.target.value as ProductOrigin | 'NONE',
                     }))
                   }
-                  className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-zinc-500 transition-colors"
+                  className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-500 transition-colors"
                 >
                   <option value="NONE">None</option>
                   <option value="LOCAL">LOCAL</option>
@@ -1021,7 +1024,7 @@ export default function ProductsPage() {
 
               {/* Color */}
               <div>
-                <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
                   Color
                 </label>
                 <input
@@ -1032,13 +1035,13 @@ export default function ProductsPage() {
                   onChange={(e) =>
                     setVariantForm((prev) => ({ ...prev, color: e.target.value }))
                   }
-                  className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-zinc-500 transition-colors"
+                  className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-500 transition-colors"
                 />
               </div>
 
               {/* SKU */}
               <div>
-                <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
                   SKU
                 </label>
                 <input
@@ -1049,14 +1052,14 @@ export default function ProductsPage() {
                   onChange={(e) =>
                     setVariantForm((prev) => ({ ...prev, sku: e.target.value }))
                   }
-                  className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-sm text-zinc-100 font-mono focus:outline-none focus:border-zinc-500 transition-colors"
+                  className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 font-mono focus:outline-none focus:border-zinc-500 transition-colors"
                 />
               </div>
 
               {/* Two Column Grid: Thickness & Size */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+                  <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
                     Thickness
                   </label>
                   <input
@@ -1071,11 +1074,11 @@ export default function ProductsPage() {
                         thickness: e.target.value,
                       }))
                     }
-                    className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-zinc-500 transition-colors"
+                    className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-500 transition-colors"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+                  <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
                     Size
                   </label>
                   <input
@@ -1086,7 +1089,7 @@ export default function ProductsPage() {
                     onChange={(e) =>
                       setVariantForm((prev) => ({ ...prev, size: e.target.value }))
                     }
-                    className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-zinc-500 transition-colors"
+                    className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-500 transition-colors"
                   />
                 </div>
               </div>
@@ -1095,14 +1098,14 @@ export default function ProductsPage() {
                 <button
                   type="button"
                   onClick={() => setIsAddVariantOpen(false)}
-                  className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-4 py-2 rounded-lg text-xs md:text-sm font-medium transition-colors"
+                  className="bg-zinc-100 hover:bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-300 px-4 py-2 rounded-lg text-xs md:text-sm font-medium transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   id="save-variant-submit-btn"
-                  className="bg-white hover:bg-zinc-200 text-zinc-950 font-semibold px-4 py-2 rounded-lg text-xs md:text-sm transition-colors shadow-sm"
+                  className="bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-zinc-950 font-semibold px-4 py-2 rounded-lg text-xs md:text-sm transition-colors shadow-sm cursor-pointer"
                 >
                   Save Variant
                 </button>
@@ -1114,26 +1117,26 @@ export default function ProductsPage() {
 
       {/* MODAL 3: Edit Product Variant */}
       {isEditVariantOpen && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0e0e11] border border-zinc-800 rounded-2xl p-6 w-full max-w-lg shadow-2xl relative">
+        <div className="fixed inset-0 bg-black/60 dark:bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#0e0e11] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 w-full max-w-lg shadow-2xl relative max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => setIsEditVariantOpen(false)}
-              className="absolute top-5 right-5 text-zinc-400 hover:text-white transition-colors"
+              className="absolute top-5 right-5 text-zinc-400 hover:text-zinc-700 dark:hover:text-white transition-colors cursor-pointer"
             >
               <XIcon className="w-5 h-5" />
             </button>
 
-            <h2 className="text-lg font-semibold text-zinc-100">
+            <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
               Edit Product Variant
             </h2>
-            <p className="text-xs text-zinc-400 mt-1">
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
               Update the variant attributes and specifications.
             </p>
 
             <form onSubmit={handleUpdateVariant} className="mt-5 space-y-4">
               {/* Origin Select */}
               <div>
-                <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
                   Origin
                 </label>
                 <select
@@ -1144,7 +1147,7 @@ export default function ProductsPage() {
                       origin: e.target.value as ProductOrigin | 'NONE',
                     }))
                   }
-                  className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-zinc-500 transition-colors"
+                  className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-500 transition-colors"
                 >
                   <option value="NONE">None</option>
                   <option value="LOCAL">LOCAL</option>
@@ -1154,7 +1157,7 @@ export default function ProductsPage() {
 
               {/* Color */}
               <div>
-                <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
                   Color
                 </label>
                 <input
@@ -1163,13 +1166,13 @@ export default function ProductsPage() {
                   onChange={(e) =>
                     setVariantForm((prev) => ({ ...prev, color: e.target.value }))
                   }
-                  className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-zinc-500 transition-colors"
+                  className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-500 transition-colors"
                 />
               </div>
 
               {/* SKU */}
               <div>
-                <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
                   SKU
                 </label>
                 <input
@@ -1178,14 +1181,14 @@ export default function ProductsPage() {
                   onChange={(e) =>
                     setVariantForm((prev) => ({ ...prev, sku: e.target.value }))
                   }
-                  className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-sm text-zinc-100 font-mono focus:outline-none focus:border-zinc-500 transition-colors"
+                  className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 font-mono focus:outline-none focus:border-zinc-500 transition-colors"
                 />
               </div>
 
               {/* Two Column Grid: Thickness & Size */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+                  <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
                     Thickness
                   </label>
                   <input
@@ -1198,11 +1201,11 @@ export default function ProductsPage() {
                         thickness: e.target.value,
                       }))
                     }
-                    className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-zinc-500 transition-colors"
+                    className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-500 transition-colors"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+                  <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
                     Size
                   </label>
                   <input
@@ -1211,7 +1214,7 @@ export default function ProductsPage() {
                     onChange={(e) =>
                       setVariantForm((prev) => ({ ...prev, size: e.target.value }))
                     }
-                    className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-zinc-500 transition-colors"
+                    className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-500 transition-colors"
                   />
                 </div>
               </div>
@@ -1220,13 +1223,13 @@ export default function ProductsPage() {
                 <button
                   type="button"
                   onClick={() => setIsEditVariantOpen(false)}
-                  className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-4 py-2 rounded-lg text-xs md:text-sm font-medium transition-colors"
+                  className="bg-zinc-100 hover:bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-300 px-4 py-2 rounded-lg text-xs md:text-sm font-medium transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="bg-white hover:bg-zinc-200 text-zinc-950 font-semibold px-4 py-2 rounded-lg text-xs md:text-sm transition-colors shadow-sm"
+                  className="bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-zinc-950 font-semibold px-4 py-2 rounded-lg text-xs md:text-sm transition-colors shadow-sm cursor-pointer"
                 >
                   Update Variant
                 </button>
@@ -1238,34 +1241,34 @@ export default function ProductsPage() {
 
       {/* MODAL 4: Import JSON */}
       {isImportJsonOpen && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0e0e11] border border-zinc-800 rounded-2xl p-6 w-full max-w-2xl shadow-2xl relative">
+        <div className="fixed inset-0 bg-black/60 dark:bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#0e0e11] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 w-full max-w-2xl shadow-2xl relative max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => setIsImportJsonOpen(false)}
-              className="absolute top-5 right-5 text-zinc-400 hover:text-white transition-colors"
+              className="absolute top-5 right-5 text-zinc-400 hover:text-zinc-700 dark:hover:text-white transition-colors cursor-pointer"
             >
               <XIcon className="w-5 h-5" />
             </button>
 
             <div className="flex items-center gap-2.5">
-              <FileJsonIcon className="w-5 h-5 text-zinc-400" />
-              <h2 className="text-lg font-semibold text-zinc-100">
+              <FileJsonIcon className="w-5 h-5 text-amber-500" />
+              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
                 Import Products JSON
               </h2>
             </div>
-            <p className="text-xs text-zinc-400 mt-1">
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
               Bulk upload master products and optional nested variants atomically
               inside a single transaction (up to 250 items).
             </p>
 
             <div className="mt-4 flex items-center justify-between">
-              <span className="text-xs text-zinc-400">
+              <span className="text-xs text-zinc-500 dark:text-zinc-400">
                 Supports simple products or products with nested variants.
               </span>
               <button
                 type="button"
                 onClick={loadSampleJson}
-                className="text-xs text-amber-400 hover:text-amber-300 underline underline-offset-4"
+                className="text-xs text-amber-600 dark:text-amber-400 hover:underline cursor-pointer"
               >
                 Load Sample JSON
               </button>
@@ -1279,18 +1282,18 @@ export default function ProductsPage() {
                   value={importJsonText}
                   onChange={(e) => setImportJsonText(e.target.value)}
                   placeholder={`[\n  {\n    "name": "Curtain Wall Profile 50",\n    "unit": "METER",\n    "variants": [\n      { "sku": "CW-50-BRZ", "color": "Bronze", "origin": "IMPORTED", "thickness": 1.5 }\n    ]\n  }\n]`}
-                  className="w-full p-3 bg-zinc-950 border border-zinc-800 rounded-xl font-mono text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-500 transition-colors"
+                  className="w-full p-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 rounded-xl font-mono text-xs text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus:outline-none focus:border-zinc-500 transition-colors"
                 />
               </div>
 
               {/* Live JSON Syntax Validation Status */}
               {jsonSyntaxError ? (
-                <div className="flex items-center gap-2 text-xs text-red-400">
+                <div className="flex items-center gap-2 text-xs text-red-600 dark:text-red-400">
                   <AlertCircleIcon className="w-4 h-4 shrink-0" />
                   <span>Syntax error: {jsonSyntaxError}</span>
                 </div>
               ) : validatedJsonItems ? (
-                <div className="flex items-center gap-2 text-xs text-emerald-400">
+                <div className="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400">
                   <CheckCircleIcon className="w-4 h-4 shrink-0" />
                   <span>
                     Valid JSON: {validatedJsonItems.length} product(s) ready for
@@ -1303,7 +1306,7 @@ export default function ProductsPage() {
                 <button
                   type="button"
                   onClick={() => setIsImportJsonOpen(false)}
-                  className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-4 py-2 rounded-lg text-xs md:text-sm font-medium transition-colors"
+                  className="bg-zinc-100 hover:bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-300 px-4 py-2 rounded-lg text-xs md:text-sm font-medium transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -1311,7 +1314,7 @@ export default function ProductsPage() {
                   type="submit"
                   id="import-json-submit-btn"
                   disabled={!validatedJsonItems || validatedJsonItems.length === 0}
-                  className="bg-white hover:bg-zinc-200 disabled:opacity-40 text-zinc-950 font-semibold px-4 py-2 rounded-lg text-xs md:text-sm transition-colors shadow-sm"
+                  className="bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-zinc-950 disabled:opacity-40 font-semibold px-4 py-2 rounded-lg text-xs md:text-sm transition-colors shadow-sm cursor-pointer"
                 >
                   Import Products
                 </button>

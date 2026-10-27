@@ -36,6 +36,13 @@ export default function SettingsPage() {
   // Delete Account Warning State
   const [deleteWarning, setDeleteWarning] = useState<string | null>(null);
 
+  React.useEffect(() => {
+    if (user) {
+      setName(user.name);
+      setEmail(user.email);
+    }
+  }, [user]);
+
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setProfileSuccess(null);

@@ -58,7 +58,7 @@ function EyeIcon(props: React.SVGProps<SVGSVGElement>) {
 }
 
 export default function WarehousesPage() {
-  const { user } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
 
   // ── State ──────────────────────────────────────────────────────────────────
@@ -84,6 +84,8 @@ export default function WarehousesPage() {
 
   // ── Data Fetching ──────────────────────────────────────────────────────────
   useEffect(() => {
+    if (authLoading || !isAuthenticated) return;
+
     let cancelled = false;
 
     async function loadWarehouses() {
@@ -107,7 +109,7 @@ export default function WarehousesPage() {
     return () => {
       cancelled = true;
     };
-  }, [refreshTrigger]);
+  }, [refreshTrigger, authLoading, isAuthenticated]);
 
   const refresh = useCallback(() => setRefreshTrigger((n) => n + 1), []);
 

@@ -71,10 +71,10 @@ export function SalesDocumentViewer({
         </div>
 
         {/* Printable Document Paper */}
-        <div className="p-8 sm:p-12 print:p-8 bg-white min-h-[700px] flex flex-col justify-between" id="printable-sales-document">
+        <div className="p-4 sm:p-8 md:p-12 print:p-8 bg-white min-h-[600px] sm:min-h-[700px] flex flex-col justify-between" id="printable-sales-document">
           <div>
             {/* Document Header */}
-            <div className="flex items-start justify-between border-b border-zinc-100 pb-8">
+            <div className="flex flex-col sm:flex-row items-start justify-between gap-4 border-b border-zinc-100 pb-6 sm:pb-8">
               {/* Left: Company Logo & Details */}
               <div className="flex items-start gap-4">
                 <div className="w-14 h-14 rounded-2xl bg-[#0f172a] text-white flex items-center justify-center font-bold text-lg tracking-wider shadow-sm shrink-0">
@@ -131,8 +131,8 @@ export function SalesDocumentViewer({
             </div>
 
             {/* Items Table */}
-            <div className="mt-8 border border-zinc-200 rounded-xl overflow-hidden shadow-xs">
-              <table className="w-full text-left text-xs">
+            <div className="mt-6 sm:mt-8 border border-zinc-200 rounded-xl overflow-x-auto shadow-xs">
+              <table className="w-full min-w-[480px] sm:min-w-0 text-left text-xs">
                 <thead>
                   <tr className="bg-[#0f172a] text-white">
                     <th className="py-3 px-4 font-semibold">Item</th>

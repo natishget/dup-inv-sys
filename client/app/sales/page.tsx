@@ -101,7 +101,7 @@ const emptyCreateForm = (defaultWhId: string = ''): CreateSaleForm => ({
 });
 
 export default function SalesPage() {
-  const { user } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const canMutate = user?.role === 'ADMIN' || user?.role === 'SALES';
 
   // ─── List State ─────────────────────────────────────────────────────────────
@@ -150,20 +150,13 @@ export default function SalesPage() {
     items: [{ variantId: '', quantity: '1' }],
   });
 
-  // Set today date on client mount
-  useEffect(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    setCreateForm((prev) => ({ ...prev, saleDate: prev.saleDate || today }));
-    setVoidForm((prev) => ({ ...prev, voidDate: prev.voidDate || today }));
-    setReturnForm((prev) => ({ ...prev, returnDate: prev.returnDate || today }));
-  }, []);
-
   // ─── Document Viewer State (Quotation / Invoice) ─────────────────────────────
   const [documentViewerOpen, setDocumentViewerOpen] = useState(false);
   const [documentData, setDocumentData] = useState<SalesDocumentData | null>(null);
 
   // ─── 1. Fetch Warehouses and Variants ───────────────────────────────────────
   useEffect(() => {
+    if (authLoading || !isAuthenticated) return;
     let isMounted = true;
 
     async function loadCatalogs() {
@@ -194,11 +187,11 @@ export default function SalesPage() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [authLoading, isAuthenticated]);
 
   // ─── 2. Fetch Live Stock when warehouse changes ─────────────────────────────
   const loadWarehouseStock = useCallback(async (warehouseId: string) => {
-    if (!warehouseId) {
+    if (!warehouseId || authLoading || !isAuthenticated) {
       setWarehouseStockMap({});
       return;
     }
@@ -213,16 +206,18 @@ export default function SalesPage() {
       console.error('Failed to load warehouse stock:', err);
       setWarehouseStockMap({});
     }
-  }, []);
+  }, [authLoading, isAuthenticated]);
 
   useEffect(() => {
-    if (createForm.warehouseId) {
+    if (createForm.warehouseId && !authLoading && isAuthenticated) {
       loadWarehouseStock(createForm.warehouseId);
     }
-  }, [createForm.warehouseId, loadWarehouseStock]);
+  }, [createForm.warehouseId, loadWarehouseStock, authLoading, isAuthenticated]);
 
   // ─── 3. Fetch Sales List ───────────────────────────────────────────────────
   const fetchSales = useCallback(async () => {
+    if (authLoading || !isAuthenticated) return;
+
     setIsLoading(true);
     setErrorMessage(null);
 
@@ -245,11 +240,13 @@ export default function SalesPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [page, filterOrder, searchCustomer, filterStatus, filterDate]);
+  }, [page, filterOrder, searchCustomer, filterStatus, filterDate, authLoading, isAuthenticated]);
 
   useEffect(() => {
-    fetchSales();
-  }, [fetchSales, refreshTrigger]);
+    if (!authLoading && isAuthenticated) {
+      fetchSales();
+    }
+  }, [fetchSales, refreshTrigger, authLoading, isAuthenticated]);
 
   // Filter Bar Handlers
   const handleApplyFilters = (e: React.FormEvent) => {
@@ -666,8 +663,8 @@ export default function SalesPage() {
         {/* Page Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-zinc-100">Sales</h1>
-            <p className="text-xs text-zinc-400 mt-1">
+            <h1 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">Sales</h1>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
               Create sales with multiple items and consume inventory FIFO layers.
             </p>
           </div>
@@ -675,7 +672,7 @@ export default function SalesPage() {
           {canMutate && (
             <button
               onClick={handleOpenMakeSale}
-              className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-zinc-950 bg-white hover:bg-zinc-200 rounded-xl shadow-sm transition-all cursor-pointer"
+              className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white dark:text-zinc-950 bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-200 rounded-xl shadow-sm transition-all cursor-pointer self-start sm:self-auto"
             >
               <PlusIcon className="w-3.5 h-3.5" />
               Make Sale
@@ -686,34 +683,34 @@ export default function SalesPage() {
         {/* Filter Bar */}
         <form
           onSubmit={handleApplyFilters}
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 p-4 bg-[#0a0a0c] border border-zinc-800/80 rounded-2xl"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 p-4 bg-white dark:bg-[#0a0a0c] border border-zinc-200 dark:border-zinc-800/80 rounded-2xl shadow-xs"
         >
           {/* Search Customer */}
           <div>
-            <label className="block text-[11px] font-medium text-zinc-400 mb-1.5">
+            <label className="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-400 mb-1.5">
               Search Customer
             </label>
             <div className="relative">
-              <SearchIcon className="absolute left-3 top-2.5 w-3.5 h-3.5 text-zinc-500" />
+              <SearchIcon className="absolute left-3 top-2.5 w-3.5 h-3.5 text-zinc-400" />
               <input
                 type="text"
                 placeholder="Search customer"
                 value={pendingSearch}
                 onChange={(e) => setPendingSearch(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-zinc-600 transition-colors"
+                className="w-full pl-8 pr-3 py-1.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs text-zinc-900 dark:text-zinc-200 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600 transition-colors"
               />
             </div>
           </div>
 
           {/* Status */}
           <div>
-            <label className="block text-[11px] font-medium text-zinc-400 mb-1.5">
+            <label className="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-400 mb-1.5">
               Status
             </label>
             <select
               value={pendingStatus}
               onChange={(e) => setPendingStatus(e.target.value)}
-              className="w-full px-3 py-1.5 bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-zinc-600 transition-colors"
+              className="w-full px-3 py-1.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs text-zinc-900 dark:text-zinc-200 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600 transition-colors"
             >
               <option value="">All statuses</option>
               <option value="POSTED">POSTED</option>
@@ -723,26 +720,26 @@ export default function SalesPage() {
 
           {/* Date */}
           <div>
-            <label className="block text-[11px] font-medium text-zinc-400 mb-1.5">
+            <label className="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-400 mb-1.5">
               Date
             </label>
             <input
               type="date"
               value={pendingDate}
               onChange={(e) => setPendingDate(e.target.value)}
-              className="w-full px-3 py-1.5 bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-zinc-600 transition-colors"
+              className="w-full px-3 py-1.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs text-zinc-900 dark:text-zinc-200 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600 transition-colors"
             />
           </div>
 
           {/* Date Order */}
           <div>
-            <label className="block text-[11px] font-medium text-zinc-400 mb-1.5">
+            <label className="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-400 mb-1.5">
               Date Order
             </label>
             <select
               value={pendingOrder}
               onChange={(e) => setPendingOrder(e.target.value as 'asc' | 'desc')}
-              className="w-full px-3 py-1.5 bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-zinc-600 transition-colors"
+              className="w-full px-3 py-1.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs text-zinc-900 dark:text-zinc-200 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600 transition-colors"
             >
               <option value="desc">Newest first</option>
               <option value="asc">Oldest first</option>
@@ -753,14 +750,14 @@ export default function SalesPage() {
           <div className="flex items-end gap-2">
             <button
               type="submit"
-              className="flex-1 py-1.5 px-3 bg-zinc-200 hover:bg-white text-zinc-950 font-semibold text-xs rounded-lg transition-colors cursor-pointer"
+              className="flex-1 py-1.5 px-3 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-200 dark:hover:bg-white dark:text-zinc-950 font-semibold text-xs rounded-lg transition-colors cursor-pointer"
             >
               Apply
             </button>
             <button
               type="button"
               onClick={handleResetFilters}
-              className="py-1.5 px-3 bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 font-medium text-xs rounded-lg transition-colors cursor-pointer"
+              className="py-1.5 px-3 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border border-zinc-200 dark:bg-zinc-800/80 dark:hover:bg-zinc-700 dark:text-zinc-300 dark:border-transparent font-medium text-xs rounded-lg transition-colors cursor-pointer"
             >
               Reset
             </button>
@@ -768,11 +765,11 @@ export default function SalesPage() {
         </form>
 
         {/* Sales Table */}
-        <div className="bg-[#0a0a0c] border border-zinc-800/80 rounded-2xl overflow-hidden shadow-xs">
+        <div className="bg-white dark:bg-[#0a0a0c] border border-zinc-200 dark:border-zinc-800/80 rounded-2xl overflow-hidden shadow-xs">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <table className="w-full text-left text-xs min-w-[640px]">
               <thead>
-                <tr className="border-b border-zinc-800/80 text-zinc-400 text-[11px] uppercase tracking-wider bg-zinc-900/40">
+                <tr className="border-b border-zinc-200 dark:border-zinc-800/80 text-zinc-500 dark:text-zinc-400 text-[11px] uppercase tracking-wider bg-zinc-50 dark:bg-zinc-900/40">
                   <th className="py-3.5 px-4 font-semibold">Customer</th>
                   <th className="py-3.5 px-4 font-semibold">Date</th>
                   <th className="py-3.5 px-4 font-semibold">Status</th>
@@ -781,12 +778,12 @@ export default function SalesPage() {
                   <th className="py-3.5 px-4 font-semibold text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-800/60 text-zinc-300">
+              <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800/60 text-zinc-700 dark:text-zinc-300">
                 {isLoading ? (
                   <tr>
                     <td colSpan={6} className="py-12 text-center text-zinc-500">
                       <div className="inline-flex items-center gap-2">
-                        <RefreshCwIcon className="w-4 h-4 animate-spin" />
+                        <RefreshCwIcon className="w-4 h-4 animate-spin text-zinc-400" />
                         <span>Loading sales...</span>
                       </div>
                     </td>
@@ -802,14 +799,14 @@ export default function SalesPage() {
                     const isVoided = sale.status === 'VOIDED';
 
                     return (
-                      <tr key={sale.id} className="hover:bg-zinc-900/30 transition-colors">
+                      <tr key={sale.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-900/30 transition-colors">
                         {/* Customer */}
-                        <td className="py-4 px-4 font-medium text-zinc-100 whitespace-nowrap">
+                        <td className="py-4 px-4 font-medium text-zinc-900 dark:text-zinc-100 whitespace-nowrap">
                           {sale.customerName || 'Walk-in Customer'}
                         </td>
 
                         {/* Date */}
-                        <td className="py-4 px-4 text-zinc-400 whitespace-nowrap">
+                        <td className="py-4 px-4 text-zinc-500 dark:text-zinc-400 whitespace-nowrap">
                           {formatDateOnly(sale.saleDate)}
                         </td>
 
@@ -818,8 +815,8 @@ export default function SalesPage() {
                           <span
                             className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide uppercase ${
                               isVoided
-                                ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                                : 'bg-zinc-800 text-zinc-300 border border-zinc-700/60'
+                                ? 'bg-rose-50 text-rose-600 border border-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20'
+                                : 'bg-zinc-100 text-zinc-700 border border-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700/60'
                             }`}
                           >
                             {sale.status}
@@ -828,10 +825,10 @@ export default function SalesPage() {
 
                         {/* Items */}
                         <td className="py-4 px-4 max-w-xs">
-                          <div className="font-medium text-zinc-200">
+                          <div className="font-medium text-zinc-800 dark:text-zinc-200">
                             {sale.items.length} items
                           </div>
-                          <div className="text-[11px] text-zinc-500 truncate mt-0.5" title={sale.items.map(it => {
+                          <div className="text-[11px] text-zinc-400 dark:text-zinc-500 truncate mt-0.5" title={sale.items.map(it => {
                             const pName = it.variant?.product?.name || 'Item';
                             const sku = it.variant?.sku || '';
                             const col = it.variant?.color || '';
@@ -854,7 +851,7 @@ export default function SalesPage() {
                         </td>
 
                         {/* Total */}
-                        <td className="py-4 px-4 text-right font-medium text-zinc-100 whitespace-nowrap">
+                        <td className="py-4 px-4 text-right font-medium text-zinc-900 dark:text-zinc-100 whitespace-nowrap font-mono">
                           {fmt(sale.totalAmount)}
                         </td>
 
@@ -865,7 +862,7 @@ export default function SalesPage() {
                             <button
                               onClick={() => handleViewInvoice(sale)}
                               title="View Invoice"
-                              className="px-2 py-1 text-[11px] font-medium bg-zinc-800/80 hover:bg-zinc-700 text-zinc-200 rounded-md transition-colors cursor-pointer inline-flex items-center gap-1"
+                              className="px-2 py-1 text-[11px] font-medium bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border border-zinc-200 dark:bg-zinc-800/80 dark:hover:bg-zinc-700 dark:text-zinc-200 dark:border-transparent rounded-md transition-colors cursor-pointer inline-flex items-center gap-1"
                             >
                               <FileTextIcon className="w-3 h-3 text-zinc-400" />
                               Invoice
@@ -876,7 +873,7 @@ export default function SalesPage() {
                                 {/* Edit */}
                                 <button
                                   onClick={() => handleOpenEdit(sale)}
-                                  className="px-2.5 py-1 text-[11px] font-medium bg-zinc-800/80 hover:bg-zinc-700 text-zinc-200 rounded-md transition-colors cursor-pointer"
+                                  className="px-2.5 py-1 text-[11px] font-medium bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border border-zinc-200 dark:bg-zinc-800/80 dark:hover:bg-zinc-700 dark:text-zinc-200 dark:border-transparent rounded-md transition-colors cursor-pointer"
                                 >
                                   Edit
                                 </button>
@@ -884,7 +881,7 @@ export default function SalesPage() {
                                 {/* Return */}
                                 <button
                                   onClick={() => handleOpenReturn(sale)}
-                                  className="px-2.5 py-1 text-[11px] font-medium bg-zinc-800/80 hover:bg-zinc-700 text-zinc-200 rounded-md transition-colors cursor-pointer"
+                                  className="px-2.5 py-1 text-[11px] font-medium bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border border-zinc-200 dark:bg-zinc-800/80 dark:hover:bg-zinc-700 dark:text-zinc-200 dark:border-transparent rounded-md transition-colors cursor-pointer"
                                 >
                                   Return
                                 </button>
@@ -900,7 +897,7 @@ export default function SalesPage() {
                             )}
 
                             {isVoided && (
-                              <span className="text-[11px] text-zinc-600 italic px-2">
+                              <span className="text-[11px] text-zinc-400 dark:text-zinc-600 italic px-2">
                                 Voided
                               </span>
                             )}
@@ -915,7 +912,7 @@ export default function SalesPage() {
           </div>
 
           {/* Pagination Footer */}
-          <div className="flex items-center justify-between px-4 py-3 border-t border-zinc-800/80 bg-zinc-900/20 text-xs text-zinc-400">
+          <div className="flex items-center justify-between px-4 py-3 border-t border-zinc-200 dark:border-zinc-800/80 bg-zinc-50/60 dark:bg-zinc-900/20 text-xs text-zinc-500 dark:text-zinc-400">
             <div>
               Showing {sales.length > 0 ? (meta.page - 1) * 10 + 1 : 0}-
               {Math.min(meta.page * 10, meta.total)} of {meta.total}
@@ -924,14 +921,14 @@ export default function SalesPage() {
               <button
                 disabled={meta.page <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="px-3 py-1 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-800 transition-colors cursor-pointer"
+                className="px-3 py-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg text-zinc-700 dark:text-zinc-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
               >
                 Previous
               </button>
               <button
                 disabled={meta.page >= meta.totalPages}
                 onClick={() => setPage((p) => p + 1)}
-                className="px-3 py-1 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-800 transition-colors cursor-pointer"
+                className="px-3 py-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg text-zinc-700 dark:text-zinc-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
               >
                 Next
               </button>
@@ -942,19 +939,19 @@ export default function SalesPage() {
 
       {/* ─── MAKE SALE MODAL ─────────────────────────────────────────────────── */}
       {isMakeSaleOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
-          <div className="relative w-full max-w-2xl bg-[#0c0c0e] border border-zinc-800 rounded-2xl shadow-2xl p-6 text-zinc-100 my-8">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/80 backdrop-blur-sm overflow-y-auto">
+          <div className="relative w-full max-w-2xl bg-white dark:bg-[#0c0c0e] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-5 sm:p-6 text-zinc-900 dark:text-zinc-100 my-8 max-h-[90vh] overflow-y-auto">
             {/* Header */}
-            <div className="flex items-start justify-between pb-4 border-b border-zinc-800/80">
+            <div className="flex items-start justify-between pb-4 border-b border-zinc-200 dark:border-zinc-800/80">
               <div>
-                <h2 className="text-base font-bold text-zinc-100">Make Sale</h2>
-                <p className="text-xs text-zinc-400 mt-0.5">
+                <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100">Make Sale</h2>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
                   Add one or more items to record a sale.
                 </p>
               </div>
               <button
                 onClick={() => setIsMakeSaleOpen(false)}
-                className="p-1 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 transition-colors cursor-pointer"
+                className="p-1 text-zinc-400 hover:text-zinc-700 dark:hover:text-white rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
               >
                 <XIcon className="w-4 h-4" />
               </button>
@@ -963,41 +960,41 @@ export default function SalesPage() {
             <form onSubmit={handleSaveSale} className="space-y-4 mt-4">
               {/* Customer Name */}
               <div>
-                <label className="block text-xs font-medium text-zinc-300 mb-1">
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
                   Customer Name
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Adebe Kebede"
+                  placeholder="e.g. Abebe Kebede"
                   value={createForm.customerName}
                   onChange={(e) =>
                     setCreateForm((prev) => ({ ...prev, customerName: e.target.value }))
                   }
                   required
-                  className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-zinc-100 focus:outline-none focus:border-zinc-600 transition-colors"
+                  className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-xl text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-zinc-500 transition-colors"
                 />
               </div>
 
               {/* Notes */}
               <div>
-                <label className="block text-xs font-medium text-zinc-300 mb-1">
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
                   Notes
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. This is a Test Note"
+                  placeholder="e.g. Regular commercial delivery"
                   value={createForm.notes}
                   onChange={(e) =>
                     setCreateForm((prev) => ({ ...prev, notes: e.target.value }))
                   }
-                  className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-zinc-100 focus:outline-none focus:border-zinc-600 transition-colors"
+                  className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-xl text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-zinc-500 transition-colors"
                 />
               </div>
 
               {/* Two-column Row: Sale Date & Warehouse */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1">
+                  <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
                     Sale Date
                   </label>
                   <input
@@ -1006,12 +1003,12 @@ export default function SalesPage() {
                     onChange={(e) =>
                       setCreateForm((prev) => ({ ...prev, saleDate: e.target.value }))
                     }
-                    className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-zinc-100 focus:outline-none focus:border-zinc-600 transition-colors"
+                    className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-xl text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-500 transition-colors"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1">
+                  <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
                     Warehouse
                   </label>
                   <select
@@ -1020,7 +1017,7 @@ export default function SalesPage() {
                       setCreateForm((prev) => ({ ...prev, warehouseId: e.target.value }))
                     }
                     required
-                    className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-zinc-100 focus:outline-none focus:border-zinc-600 transition-colors"
+                    className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-xl text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-500 transition-colors"
                   >
                     {warehouses.map((wh) => (
                       <option key={wh.id} value={wh.id}>
@@ -1033,12 +1030,12 @@ export default function SalesPage() {
 
               {/* Sale Items Section */}
               <div className="pt-2">
-                <div className="flex items-center justify-between pb-2 border-b border-zinc-800/60">
-                  <span className="text-xs font-bold text-zinc-200">Sale Items</span>
+                <div className="flex items-center justify-between pb-2 border-b border-zinc-200 dark:border-zinc-800/60">
+                  <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200">Sale Items</span>
                   <button
                     type="button"
                     onClick={handleAddSaleRow}
-                    className="text-xs font-medium text-zinc-300 hover:text-white bg-zinc-800/80 hover:bg-zinc-700 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                    className="text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800/80 dark:hover:bg-zinc-700 px-2.5 py-1 rounded-lg border border-zinc-200 dark:border-transparent transition-colors cursor-pointer"
                   >
                     + Add Row
                   </button>
@@ -1053,11 +1050,11 @@ export default function SalesPage() {
                     return (
                       <div
                         key={idx}
-                        className="flex flex-col sm:flex-row items-start sm:items-center gap-2 p-3 bg-zinc-900/60 border border-zinc-800/80 rounded-xl"
+                        className="flex flex-col sm:flex-row items-start sm:items-center gap-2 p-3 bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800/80 rounded-xl"
                       >
                         {/* Variant Dropdown */}
                         <div className="flex-1 w-full">
-                          <label className="block text-[10px] text-zinc-500 mb-1">
+                          <label className="block text-[10px] font-semibold text-zinc-500 mb-1">
                             Variant
                           </label>
                           <select
@@ -1066,7 +1063,7 @@ export default function SalesPage() {
                               handleSaleRowChange(idx, 'variantId', e.target.value)
                             }
                             required
-                            className="w-full px-2.5 py-1.5 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-zinc-600"
+                            className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs text-zinc-900 dark:text-zinc-200 focus:outline-none focus:border-zinc-500"
                           >
                             <option value="">Select product variant...</option>
                             {allVariants.map((v) => {
@@ -1085,8 +1082,8 @@ export default function SalesPage() {
                               <span
                                 className={`text-[11px] font-medium ${
                                   (availStock || 0) > 0
-                                    ? 'text-emerald-400'
-                                    : 'text-rose-400'
+                                    ? 'text-emerald-600 dark:text-emerald-400'
+                                    : 'text-rose-600 dark:text-rose-400'
                                 }`}
                               >
                                 Available: {availStock !== null ? availStock : 0}
@@ -1102,7 +1099,7 @@ export default function SalesPage() {
 
                         {/* Quantity */}
                         <div className="w-full sm:w-24">
-                          <label className="block text-[10px] text-zinc-500 mb-1">
+                          <label className="block text-[10px] font-semibold text-zinc-500 mb-1">
                             Quantity
                           </label>
                           <input
@@ -1114,13 +1111,13 @@ export default function SalesPage() {
                               handleSaleRowChange(idx, 'quantity', e.target.value)
                             }
                             required
-                            className="w-full px-2.5 py-1.5 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-zinc-600"
+                            className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs text-zinc-900 dark:text-zinc-200 focus:outline-none focus:border-zinc-500"
                           />
                         </div>
 
                         {/* Selling Price */}
                         <div className="w-full sm:w-32">
-                          <label className="block text-[10px] text-zinc-500 mb-1">
+                          <label className="block text-[10px] font-semibold text-zinc-500 mb-1">
                             Selling Price
                           </label>
                           <input
@@ -1133,7 +1130,7 @@ export default function SalesPage() {
                               handleSaleRowChange(idx, 'sellingPrice', e.target.value)
                             }
                             required
-                            className="w-full px-2.5 py-1.5 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-zinc-600"
+                            className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs text-zinc-900 dark:text-zinc-200 focus:outline-none focus:border-zinc-500"
                           />
                         </div>
 
@@ -1143,7 +1140,7 @@ export default function SalesPage() {
                             <button
                               type="button"
                               onClick={() => handleRemoveSaleRow(idx)}
-                              className="p-1.5 text-zinc-500 hover:text-rose-400 rounded-lg hover:bg-zinc-800 transition-colors cursor-pointer"
+                              className="p-1.5 text-zinc-400 hover:text-rose-600 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
                               title="Delete Row"
                             >
                               <Trash2Icon className="w-4 h-4" />
@@ -1157,11 +1154,11 @@ export default function SalesPage() {
               </div>
 
               {/* Modal Footer Controls */}
-              <div className="pt-4 border-t border-zinc-800/80 flex items-center justify-end gap-2.5">
+              <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800/80 flex flex-wrap items-center justify-end gap-2.5">
                 <button
                   type="button"
                   onClick={() => setIsMakeSaleOpen(false)}
-                  className="px-3.5 py-2 text-xs font-medium text-zinc-400 hover:text-zinc-200 bg-zinc-900 hover:bg-zinc-800 rounded-xl transition-colors cursor-pointer"
+                  className="px-3.5 py-2 text-xs font-medium text-zinc-700 hover:text-zinc-900 bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 dark:text-zinc-400 dark:border-transparent rounded-xl transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -1169,7 +1166,7 @@ export default function SalesPage() {
                 <button
                   type="button"
                   onClick={handleGenerateQuotation}
-                  className="px-3.5 py-2 text-xs font-medium text-zinc-200 hover:text-white bg-zinc-800 hover:bg-zinc-700 rounded-xl transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                  className="px-3.5 py-2 text-xs font-medium text-zinc-800 hover:text-zinc-950 bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-200 dark:border-transparent rounded-xl transition-colors cursor-pointer inline-flex items-center gap-1.5"
                 >
                   <FileTextIcon className="w-3.5 h-3.5 text-zinc-400" />
                   Generate Quotation
@@ -1177,7 +1174,7 @@ export default function SalesPage() {
 
                 <button
                   type="submit"
-                  className="px-4 py-2 text-xs font-semibold text-zinc-950 bg-white hover:bg-zinc-200 rounded-xl shadow-sm transition-all cursor-pointer"
+                  className="px-4 py-2 text-xs font-semibold text-white dark:text-zinc-950 bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-200 rounded-xl shadow-sm transition-all cursor-pointer"
                 >
                   Save Sale
                 </button>
@@ -1189,18 +1186,18 @@ export default function SalesPage() {
 
       {/* ─── EDIT SALE METADATA MODAL ────────────────────────────────────────── */}
       {editingSale && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="relative w-full max-w-md bg-[#0c0c0e] border border-zinc-800 rounded-2xl shadow-2xl p-6 text-zinc-100">
-            <div className="flex items-start justify-between pb-4 border-b border-zinc-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/80 backdrop-blur-sm">
+          <div className="relative w-full max-w-md bg-white dark:bg-[#0c0c0e] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-6 text-zinc-900 dark:text-zinc-100 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-start justify-between pb-4 border-b border-zinc-200 dark:border-zinc-800">
               <div>
-                <h2 className="text-base font-bold text-zinc-100">Edit Sale Metadata</h2>
-                <p className="text-xs text-zinc-400 mt-0.5">
+                <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100">Edit Sale Metadata</h2>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
                   Update customer remarks without altering financial lines.
                 </p>
               </div>
               <button
                 onClick={() => setEditingSale(null)}
-                className="p-1 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 transition-colors cursor-pointer"
+                className="p-1 text-zinc-400 hover:text-zinc-700 dark:hover:text-white rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
               >
                 <XIcon className="w-4 h-4" />
               </button>
@@ -1208,7 +1205,7 @@ export default function SalesPage() {
 
             <form onSubmit={handleSaveEdit} className="space-y-4 mt-4">
               <div>
-                <label className="block text-xs font-medium text-zinc-300 mb-1">
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
                   Customer Name
                 </label>
                 <input
@@ -1218,12 +1215,12 @@ export default function SalesPage() {
                     setEditForm((prev) => ({ ...prev, customerName: e.target.value }))
                   }
                   required
-                  className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-zinc-100 focus:outline-none focus:border-zinc-600 transition-colors"
+                  className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-xl text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-500 transition-colors"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-zinc-300 mb-1">
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
                   Notes
                 </label>
                 <textarea
@@ -1232,21 +1229,21 @@ export default function SalesPage() {
                   onChange={(e) =>
                     setEditForm((prev) => ({ ...prev, notes: e.target.value }))
                   }
-                  className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-zinc-100 focus:outline-none focus:border-zinc-600 transition-colors"
+                  className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-xl text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-500 transition-colors"
                 />
               </div>
 
-              <div className="pt-3 border-t border-zinc-800 flex justify-end gap-2">
+              <div className="pt-3 border-t border-zinc-200 dark:border-zinc-800 flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setEditingSale(null)}
-                  className="px-3 py-1.5 text-xs font-medium text-zinc-400 hover:text-zinc-200 bg-zinc-900 rounded-lg cursor-pointer"
+                  className="px-3 py-1.5 text-xs font-medium text-zinc-700 hover:text-zinc-900 bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 dark:bg-zinc-900 dark:text-zinc-400 dark:border-transparent rounded-lg cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 text-xs font-semibold text-zinc-950 bg-white hover:bg-zinc-200 rounded-lg cursor-pointer"
+                  className="px-4 py-1.5 text-xs font-semibold text-white dark:text-zinc-950 bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-200 rounded-lg cursor-pointer"
                 >
                   Save Changes
                 </button>
@@ -1258,29 +1255,29 @@ export default function SalesPage() {
 
       {/* ─── VOID SALE MODAL ─────────────────────────────────────────────────── */}
       {voidingSale && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="relative w-full max-w-md bg-[#0c0c0e] border border-rose-900/40 rounded-2xl shadow-2xl p-6 text-zinc-100">
-            <div className="flex items-start justify-between pb-4 border-b border-zinc-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/80 backdrop-blur-sm">
+          <div className="relative w-full max-w-md bg-white dark:bg-[#0c0c0e] border border-rose-200 dark:border-rose-900/40 rounded-2xl shadow-2xl p-6 text-zinc-900 dark:text-zinc-100 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-start justify-between pb-4 border-b border-zinc-200 dark:border-zinc-800">
               <div className="flex items-center gap-2">
                 <BanIcon className="w-5 h-5 text-rose-500 shrink-0" />
-                <h2 className="text-base font-bold text-zinc-100">Void Sale Order</h2>
+                <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100">Void Sale Order</h2>
               </div>
               <button
                 onClick={() => setVoidingSale(null)}
-                className="p-1 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 transition-colors cursor-pointer"
+                className="p-1 text-zinc-400 hover:text-zinc-700 dark:hover:text-white rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
               >
                 <XIcon className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="mt-4 p-3 bg-rose-500/10 border border-rose-500/20 text-rose-300 rounded-xl text-xs leading-relaxed">
+            <div className="mt-4 p-3 bg-rose-50 border border-rose-200 text-rose-700 dark:bg-rose-500/10 dark:border-rose-500/20 dark:text-rose-300 rounded-xl text-xs leading-relaxed">
               <strong>Warning:</strong> Voiding will reverse all inventory movements (+quantity SALE_RETURN) and restore consumed FIFO cost layers. This action is irreversible.
             </div>
 
             <form onSubmit={handleConfirmVoid} className="space-y-4 mt-4">
               <div>
-                <label className="block text-xs font-medium text-zinc-300 mb-1">
-                  Audit Justification Reason <span className="text-rose-400">*</span>
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                  Audit Justification Reason <span className="text-rose-500">*</span>
                 </label>
                 <textarea
                   rows={3}
@@ -1290,12 +1287,12 @@ export default function SalesPage() {
                     setVoidForm((prev) => ({ ...prev, reason: e.target.value }))
                   }
                   required
-                  className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-zinc-100 focus:outline-none focus:border-zinc-600 transition-colors"
+                  className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-xl text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-500 transition-colors"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-zinc-300 mb-1">
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
                   Void Effective Date
                 </label>
                 <input
@@ -1304,15 +1301,15 @@ export default function SalesPage() {
                   onChange={(e) =>
                     setVoidForm((prev) => ({ ...prev, voidDate: e.target.value }))
                   }
-                  className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-zinc-100 focus:outline-none focus:border-zinc-600 transition-colors"
+                  className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-xl text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-500 transition-colors"
                 />
               </div>
 
-              <div className="pt-3 border-t border-zinc-800 flex justify-end gap-2">
+              <div className="pt-3 border-t border-zinc-200 dark:border-zinc-800 flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setVoidingSale(null)}
-                  className="px-3 py-1.5 text-xs font-medium text-zinc-400 hover:text-zinc-200 bg-zinc-900 rounded-lg cursor-pointer"
+                  className="px-3 py-1.5 text-xs font-medium text-zinc-700 hover:text-zinc-900 bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 dark:bg-zinc-900 dark:text-zinc-400 dark:border-transparent rounded-lg cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -1330,25 +1327,25 @@ export default function SalesPage() {
 
       {/* ─── RETURN SALE MODAL ───────────────────────────────────────────────── */}
       {returningSale && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="relative w-full max-w-lg bg-[#0c0c0e] border border-zinc-800 rounded-2xl shadow-2xl p-6 text-zinc-100">
-            <div className="flex items-start justify-between pb-4 border-b border-zinc-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/80 backdrop-blur-sm">
+          <div className="relative w-full max-w-lg bg-white dark:bg-[#0c0c0e] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-6 text-zinc-900 dark:text-zinc-100 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-start justify-between pb-4 border-b border-zinc-200 dark:border-zinc-800">
               <div className="flex items-center gap-2">
-                <RotateCcwIcon className="w-5 h-5 text-zinc-300 shrink-0" />
-                <h2 className="text-base font-bold text-zinc-100">Process Customer Return</h2>
+                <RotateCcwIcon className="w-5 h-5 text-zinc-500 dark:text-zinc-300 shrink-0" />
+                <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100">Process Customer Return</h2>
               </div>
               <button
                 onClick={() => setReturningSale(null)}
-                className="p-1 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 transition-colors cursor-pointer"
+                className="p-1 text-zinc-400 hover:text-zinc-700 dark:hover:text-white rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
               >
                 <XIcon className="w-4 h-4" />
               </button>
             </div>
 
             <form onSubmit={handleConfirmReturn} className="space-y-4 mt-4">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1">
+                  <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
                     Receiving Warehouse
                   </label>
                   <select
@@ -1357,7 +1354,7 @@ export default function SalesPage() {
                       setReturnForm((prev) => ({ ...prev, warehouseId: e.target.value }))
                     }
                     required
-                    className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-zinc-100 focus:outline-none focus:border-zinc-600"
+                    className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-xl text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-500"
                   >
                     {warehouses.map((wh) => (
                       <option key={wh.id} value={wh.id}>
@@ -1368,7 +1365,7 @@ export default function SalesPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1">
+                  <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
                     Return Date
                   </label>
                   <input
@@ -1377,14 +1374,14 @@ export default function SalesPage() {
                     onChange={(e) =>
                       setReturnForm((prev) => ({ ...prev, returnDate: e.target.value }))
                     }
-                    className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-zinc-100 focus:outline-none focus:border-zinc-600"
+                    className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-xl text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-500"
                   />
                 </div>
               </div>
 
               {/* Items in this sale available to return */}
               <div>
-                <label className="block text-xs font-medium text-zinc-300 mb-1">
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
                   Item to Return
                 </label>
                 <select
@@ -1396,7 +1393,7 @@ export default function SalesPage() {
                     }))
                   }
                   required
-                  className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-zinc-100 focus:outline-none focus:border-zinc-600"
+                  className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-xl text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-500"
                 >
                   <option value="">Select line item...</option>
                   {returningSale.items.map((it) => {
@@ -1414,7 +1411,7 @@ export default function SalesPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-zinc-300 mb-1">
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
                   Return Quantity
                 </label>
                 <input
@@ -1429,12 +1426,12 @@ export default function SalesPage() {
                     }))
                   }
                   required
-                  className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-zinc-100 focus:outline-none focus:border-zinc-600"
+                  className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-xl text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-500"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-zinc-300 mb-1">
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
                   Return Reason / Notes
                 </label>
                 <textarea
@@ -1444,21 +1441,21 @@ export default function SalesPage() {
                   onChange={(e) =>
                     setReturnForm((prev) => ({ ...prev, notes: e.target.value }))
                   }
-                  className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-zinc-100 focus:outline-none focus:border-zinc-600"
+                  className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-xl text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-500"
                 />
               </div>
 
-              <div className="pt-3 border-t border-zinc-800 flex justify-end gap-2">
+              <div className="pt-3 border-t border-zinc-200 dark:border-zinc-800 flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setReturningSale(null)}
-                  className="px-3 py-1.5 text-xs font-medium text-zinc-400 hover:text-zinc-200 bg-zinc-900 rounded-lg cursor-pointer"
+                  className="px-3 py-1.5 text-xs font-medium text-zinc-700 hover:text-zinc-900 bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 dark:bg-zinc-900 dark:text-zinc-400 dark:border-transparent rounded-lg cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 text-xs font-semibold text-zinc-950 bg-white hover:bg-zinc-200 rounded-lg cursor-pointer"
+                  className="px-4 py-1.5 text-xs font-semibold text-white dark:text-zinc-950 bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-200 rounded-lg cursor-pointer"
                 >
                   Process Return
                 </button>

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '@/hooks/use-auth';
 import { AppLayout } from '@/components/app-layout';
 import { api, getAccessToken } from '@/lib/api';
 import {
@@ -47,6 +48,8 @@ const fmt = (val: number | string | null | undefined): string => {
 };
 
 export default function CogsPage() {
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+
   // ─── Filter States ──────────────────────────────────────────────────────────
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -77,7 +80,7 @@ export default function CogsPage() {
 
   // ─── 2. Fetch COGS Report ───────────────────────────────────────────────────
   const fetchReport = useCallback(async () => {
-    if (!startDate || !endDate) return;
+    if (authLoading || !isAuthenticated || !startDate || !endDate) return;
 
     setIsLoading(true);
     setErrorMessage(null);
@@ -98,11 +101,13 @@ export default function CogsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [startDate, endDate, costingMethod, page]);
+  }, [startDate, endDate, costingMethod, page, authLoading, isAuthenticated]);
 
   useEffect(() => {
-    fetchReport();
-  }, [fetchReport]);
+    if (!authLoading && isAuthenticated) {
+      fetchReport();
+    }
+  }, [fetchReport, authLoading, isAuthenticated]);
 
   // ─── 3. Download CSV Export ─────────────────────────────────────────────────
   const handleDownloadCsv = async () => {
@@ -181,28 +186,28 @@ export default function CogsPage() {
         {/* Page Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-zinc-100">
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
               COGS Report
             </h1>
-            <p className="text-xs text-zinc-400 mt-1">
+            <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 mt-1">
               Track revenue, COGS, gross profit, and margin by product variant.
             </p>
           </div>
 
           {/* Active Method Badge */}
-          <div className="flex items-center gap-2">
-            <div className="inline-flex items-center px-3 py-1.5 rounded-lg border border-zinc-800 bg-[#0a0a0c] text-xs font-medium text-zinc-300 shadow-xs">
-              <span className="text-zinc-500 mr-1.5">Active method:</span>
-              <span className="font-semibold text-zinc-100">{activeMethod}</span>
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <div className="inline-flex items-center px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#0a0a0c] text-xs font-medium text-zinc-700 dark:text-zinc-300 shadow-xs">
+              <span className="text-zinc-400 dark:text-zinc-500 mr-1.5">Active method:</span>
+              <span className="font-semibold text-zinc-900 dark:text-zinc-100">{activeMethod}</span>
             </div>
           </div>
         </div>
 
         {/* Filter Controls Bar */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-[#0a0a0c] border border-zinc-800/80 rounded-2xl">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 p-4 bg-white dark:bg-[#0a0a0c] border border-zinc-200 dark:border-zinc-800/80 rounded-2xl shadow-xs">
           {/* Start Date */}
           <div>
-            <label className="block text-[11px] font-medium text-zinc-400 mb-1.5">
+            <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-400 mb-1.5">
               Start Date
             </label>
             <input
@@ -212,13 +217,13 @@ export default function CogsPage() {
                 setStartDate(e.target.value);
                 setPage(1);
               }}
-              className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-zinc-200 focus:outline-none focus:border-zinc-600 transition-colors"
+              className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-xl text-xs text-zinc-900 dark:text-zinc-200 focus:outline-none focus:border-zinc-500 dark:focus:border-zinc-600 transition-colors"
             />
           </div>
 
           {/* End Date */}
           <div>
-            <label className="block text-[11px] font-medium text-zinc-400 mb-1.5">
+            <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-400 mb-1.5">
               End Date
             </label>
             <input
@@ -228,13 +233,13 @@ export default function CogsPage() {
                 setEndDate(e.target.value);
                 setPage(1);
               }}
-              className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-zinc-200 focus:outline-none focus:border-zinc-600 transition-colors"
+              className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-xl text-xs text-zinc-900 dark:text-zinc-200 focus:outline-none focus:border-zinc-500 dark:focus:border-zinc-600 transition-colors"
             />
           </div>
 
           {/* Costing Method Dropdown */}
           <div>
-            <label className="block text-[11px] font-medium text-zinc-400 mb-1.5">
+            <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-400 mb-1.5">
               Costing Method
             </label>
             <select
@@ -243,7 +248,7 @@ export default function CogsPage() {
                 setCostingMethod(e.target.value as CostingMethod);
                 setPage(1);
               }}
-              className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-zinc-200 focus:outline-none focus:border-zinc-600 transition-colors"
+              className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-xl text-xs text-zinc-900 dark:text-zinc-200 focus:outline-none focus:border-zinc-500 dark:focus:border-zinc-600 transition-colors"
             >
               <option value="FIFO">FIFO</option>
               <option value="LIFO">LIFO</option>
@@ -254,7 +259,7 @@ export default function CogsPage() {
 
         {/* Simulation Warning Banner */}
         {isSimulated && (
-          <div className="flex items-start gap-3 p-3.5 bg-amber-500/10 border border-amber-500/20 text-amber-300 rounded-xl text-xs leading-relaxed">
+          <div className="flex items-start gap-3 p-3.5 bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 rounded-xl text-xs leading-relaxed">
             <span className="font-semibold shrink-0">⚠️ Simulated Costing Mode:</span>
             <span>
               You are viewing an in-memory simulated <strong>{costingMethod === 'WEIGHTED_AVERAGE' ? 'Weighted Average' : costingMethod}</strong> valuation. Corporate standard remains <strong>{activeMethod}</strong>. Historical frozen ledger records are completely unchanged.
@@ -265,36 +270,36 @@ export default function CogsPage() {
         {/* 3 Metric Summary Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {/* Revenue Card */}
-          <div className="p-6 bg-[#0a0a0c] border border-zinc-800/80 rounded-2xl space-y-2">
-            <div className="text-xs font-medium text-zinc-400">Revenue</div>
-            <div className="text-2xl font-bold tracking-tight text-zinc-100">
+          <div className="p-5 sm:p-6 bg-white dark:bg-[#0a0a0c] border border-zinc-200 dark:border-zinc-800/80 rounded-2xl space-y-2 shadow-xs">
+            <div className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">Revenue</div>
+            <div className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 font-mono">
               {fmt(summary.total_revenue)}
             </div>
           </div>
 
           {/* COGS Card */}
-          <div className="p-6 bg-[#0a0a0c] border border-zinc-800/80 rounded-2xl space-y-2">
-            <div className="text-xs font-medium text-zinc-400">COGS</div>
-            <div className="text-2xl font-bold tracking-tight text-zinc-100">
+          <div className="p-5 sm:p-6 bg-white dark:bg-[#0a0a0c] border border-zinc-200 dark:border-zinc-800/80 rounded-2xl space-y-2 shadow-xs">
+            <div className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">COGS</div>
+            <div className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 font-mono">
               {fmt(summary.total_cogs)}
             </div>
           </div>
 
           {/* Gross Profit Card */}
-          <div className="p-6 bg-[#0a0a0c] border border-zinc-800/80 rounded-2xl space-y-2">
-            <div className="text-xs font-medium text-zinc-400">Gross Profit</div>
-            <div className="text-2xl font-bold tracking-tight text-zinc-100">
+          <div className="p-5 sm:p-6 bg-white dark:bg-[#0a0a0c] border border-zinc-200 dark:border-zinc-800/80 rounded-2xl space-y-2 shadow-xs">
+            <div className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">Gross Profit</div>
+            <div className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 font-mono">
               {fmt(summary.total_gross_profit)}
             </div>
           </div>
         </div>
 
         {/* Table of Variants */}
-        <div className="bg-[#0a0a0c] border border-zinc-800/80 rounded-2xl overflow-hidden shadow-xs">
+        <div className="bg-white dark:bg-[#0a0a0c] border border-zinc-200 dark:border-zinc-800/80 rounded-2xl overflow-hidden shadow-xs">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <table className="w-full text-left text-xs min-w-[700px]">
               <thead>
-                <tr className="border-b border-zinc-800/80 text-zinc-400 text-[11px] uppercase tracking-wider bg-zinc-900/40">
+                <tr className="border-b border-zinc-200 dark:border-zinc-800/80 text-zinc-500 dark:text-zinc-400 text-[11px] uppercase tracking-wider bg-zinc-50 dark:bg-zinc-900/40">
                   <th className="py-3.5 px-4 font-semibold">Product Name</th>
                   <th className="py-3.5 px-4 font-semibold">Color</th>
                   <th className="py-3.5 px-4 font-semibold">Origin</th>
@@ -305,12 +310,12 @@ export default function CogsPage() {
                   <th className="py-3.5 px-4 font-semibold text-right">Profit Margin %</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-800/60 text-zinc-300">
+              <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800/60 text-zinc-700 dark:text-zinc-300">
                 {isLoading ? (
                   <tr>
                     <td colSpan={8} className="py-16 text-center text-zinc-500">
                       <div className="inline-flex items-center gap-2">
-                        <RefreshCwIcon className="w-4 h-4 animate-spin" />
+                        <RefreshCwIcon className="w-4 h-4 animate-spin text-zinc-400" />
                         <span>Calculating valuation metrics...</span>
                       </div>
                     </td>
@@ -325,45 +330,45 @@ export default function CogsPage() {
                   items.map((item) => (
                     <tr
                       key={item.variant_id}
-                      className="hover:bg-zinc-900/30 transition-colors"
+                      className="hover:bg-zinc-50 dark:hover:bg-zinc-900/30 transition-colors"
                     >
                       {/* Product Name */}
-                      <td className="py-4 px-4 font-medium text-zinc-100 whitespace-nowrap">
+                      <td className="py-4 px-4 font-medium text-zinc-900 dark:text-zinc-100 whitespace-nowrap">
                         {item.product_name}
                       </td>
 
                       {/* Color */}
-                      <td className="py-4 px-4 text-zinc-400 whitespace-nowrap">
+                      <td className="py-4 px-4 text-zinc-500 dark:text-zinc-400 whitespace-nowrap">
                         {item.color}
                       </td>
 
                       {/* Origin */}
-                      <td className="py-4 px-4 text-zinc-400 whitespace-nowrap">
+                      <td className="py-4 px-4 text-zinc-500 dark:text-zinc-400 whitespace-nowrap">
                         {item.origin}
                       </td>
 
                       {/* Quantity Sold */}
-                      <td className="py-4 px-4 text-center text-zinc-300 whitespace-nowrap font-medium">
+                      <td className="py-4 px-4 text-center text-zinc-700 dark:text-zinc-300 whitespace-nowrap font-medium">
                         {item.quantity_sold}
                       </td>
 
                       {/* Revenue */}
-                      <td className="py-4 px-4 text-right text-zinc-200 whitespace-nowrap font-medium">
+                      <td className="py-4 px-4 text-right text-zinc-800 dark:text-zinc-200 whitespace-nowrap font-medium font-mono">
                         {fmt(item.revenue)}
                       </td>
 
                       {/* COGS */}
-                      <td className="py-4 px-4 text-right text-zinc-200 whitespace-nowrap font-medium">
+                      <td className="py-4 px-4 text-right text-zinc-800 dark:text-zinc-200 whitespace-nowrap font-medium font-mono">
                         {fmt(item.cogs)}
                       </td>
 
                       {/* Gross Profit */}
-                      <td className="py-4 px-4 text-right text-zinc-100 whitespace-nowrap font-semibold">
+                      <td className="py-4 px-4 text-right text-zinc-900 dark:text-zinc-100 whitespace-nowrap font-semibold font-mono">
                         {fmt(item.gross_profit)}
                       </td>
 
                       {/* Profit Margin % */}
-                      <td className="py-4 px-4 text-right whitespace-nowrap font-semibold text-zinc-200">
+                      <td className="py-4 px-4 text-right whitespace-nowrap font-semibold text-zinc-900 dark:text-zinc-200 font-mono">
                         {item.profit_margin.toFixed(2)}%
                       </td>
                     </tr>
@@ -374,21 +379,21 @@ export default function CogsPage() {
           </div>
 
           {/* Footer Bar & Pagination Controls */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-4 py-3 border-t border-zinc-800/80 bg-zinc-900/20 text-xs text-zinc-400">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-4 py-3 border-t border-zinc-200 dark:border-zinc-800/80 bg-zinc-50/60 dark:bg-zinc-900/20 text-xs text-zinc-500 dark:text-zinc-400">
             <div>
               Showing {items.length > 0 ? (meta.page - 1) * 10 + 1 : 0}-
               {Math.min(meta.page * 10, meta.total)} of {meta.total}
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {/* Download CSV */}
               <button
                 type="button"
                 onClick={handleDownloadCsv}
                 disabled={isExporting || items.length === 0}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#0a0a0c] hover:bg-zinc-800 border border-zinc-800 rounded-lg text-zinc-300 font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-[#0a0a0c] hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-lg text-zinc-700 dark:text-zinc-300 font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               >
-                <DownloadIcon className="w-3.5 h-3.5 text-zinc-400" />
+                <DownloadIcon className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
                 {isExporting ? 'Exporting...' : 'Download CSV'}
               </button>
 
@@ -397,7 +402,7 @@ export default function CogsPage() {
                 type="button"
                 onClick={fetchReport}
                 disabled={isLoading}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#0a0a0c] hover:bg-zinc-800 border border-zinc-800 rounded-lg text-zinc-300 font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-[#0a0a0c] hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-lg text-zinc-700 dark:text-zinc-300 font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               >
                 <RefreshCwIcon className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
                 Refresh
@@ -407,7 +412,7 @@ export default function CogsPage() {
               <button
                 disabled={meta.page <= 1 || isLoading}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="px-3 py-1.5 bg-zinc-900/80 border border-zinc-800 rounded-lg text-zinc-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-800 transition-colors cursor-pointer"
+                className="px-3 py-1.5 bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-lg text-zinc-700 dark:text-zinc-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
               >
                 Previous
               </button>
@@ -416,7 +421,7 @@ export default function CogsPage() {
               <button
                 disabled={meta.page >= meta.totalPages || isLoading}
                 onClick={() => setPage((p) => p + 1)}
-                className="px-3 py-1.5 bg-zinc-900/80 border border-zinc-800 rounded-lg text-zinc-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-800 transition-colors cursor-pointer"
+                className="px-3 py-1.5 bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-lg text-zinc-700 dark:text-zinc-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
               >
                 Next
               </button>

@@ -18,7 +18,7 @@ import {
 } from '@/components/icons';
 
 export default function UsersManagementPage() {
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, isAuthenticated, isLoading: authLoading } = useAuth();
 
   const [users, setUsers] = useState<SafeUser[]>([]);
   const [totalUsers, setTotalUsers] = useState(0);
@@ -47,6 +47,7 @@ export default function UsersManagementPage() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   useEffect(() => {
+    if (authLoading || !isAuthenticated) return;
     let ignore = false;
     async function load() {
       setIsLoading(true);
@@ -78,7 +79,7 @@ export default function UsersManagementPage() {
     return () => {
       ignore = true;
     };
-  }, [page, searchQuery, roleFilter, refreshTrigger]);
+  }, [page, searchQuery, roleFilter, refreshTrigger, authLoading, isAuthenticated]);
 
   const refreshList = useCallback(() => {
     setRefreshTrigger((prev) => prev + 1);
