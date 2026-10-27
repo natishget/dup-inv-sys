@@ -12,6 +12,7 @@ import { WarehousesModule } from './warehouses/warehouses.module';
 import { PurchasesModule } from './purchases/purchases.module';
 import { SalesModule } from './sales/sales.module';
 import { CogsModule } from './cogs/cogs.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 import authConfig from './config/auth.config';
@@ -40,6 +41,7 @@ import authConfig from './config/auth.config';
     PurchasesModule,
     SalesModule,
     CogsModule,
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [
