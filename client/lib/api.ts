@@ -1,8 +1,8 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
 let inMemoryToken: string | null = null;
-let isRefreshing = false;
-let refreshSubscribers: Array<(token: string | null) => void> = [];
+let refreshPromise: Promise<string | null> | null = null;
+let onAuthFailureCallback: (() => void) | null = null;
 
 export function getAccessToken(): string | null {
   return inMemoryToken;
@@ -12,13 +12,54 @@ export function setAccessToken(token: string | null): void {
   inMemoryToken = token;
 }
 
-function onRefreshed(token: string | null) {
-  refreshSubscribers.forEach((callback) => callback(token));
-  refreshSubscribers = [];
+export function setOnAuthFailure(callback: (() => void) | null): void {
+  onAuthFailureCallback = callback;
 }
 
-function addRefreshSubscriber(callback: (token: string | null) => void) {
-  refreshSubscribers.push(callback);
+export function notifyAuthFailure(): void {
+  setAccessToken(null);
+  if (onAuthFailureCallback) {
+    try {
+      onAuthFailureCallback();
+    } catch {
+      // Ignore callback errors
+    }
+  }
+  if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+    window.location.replace('/login');
+  }
+}
+
+export async function refreshAccessToken(): Promise<string | null> {
+  if (refreshPromise) {
+    return refreshPromise;
+  }
+
+  refreshPromise = (async () => {
+    try {
+      const refreshRes = await fetch(`${API_BASE}/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (refreshRes.ok) {
+        const data = (await refreshRes.json()) as { accessToken: string };
+        setAccessToken(data.accessToken);
+        return data.accessToken;
+      } else {
+        setAccessToken(null);
+        return null;
+      }
+    } catch {
+      setAccessToken(null);
+      return null;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
 }
 
 export interface ApiRequestOptions extends RequestInit {
@@ -45,6 +86,11 @@ export async function apiFetch<T = unknown>(
   const { skipAuth = false, retryOn401 = true, ...customOptions } = options;
   const url = endpoint.startsWith('http') ? endpoint : `${API_BASE}${endpoint}`;
 
+  const isAuthEndpoint =
+    endpoint.includes('/auth/login') ||
+    endpoint.includes('/auth/refresh') ||
+    endpoint.includes('/auth/logout');
+
   const headers = new Headers(customOptions.headers || {});
   if (!headers.has('Content-Type') && !(customOptions.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json');
@@ -61,58 +107,21 @@ export async function apiFetch<T = unknown>(
   };
 
   try {
-    const response = await fetch(url, fetchConfig);
+    let response = await fetch(url, fetchConfig);
 
-    if (response.status === 401 && retryOn401 && !endpoint.includes('/auth/login') && !endpoint.includes('/auth/refresh')) {
-      if (!isRefreshing) {
-        isRefreshing = true;
-        try {
-          const refreshRes = await fetch(`${API_BASE}/auth/refresh`, {
-            method: 'POST',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-          });
-
-          if (refreshRes.ok) {
-            const data = (await refreshRes.json()) as { accessToken: string };
-            setAccessToken(data.accessToken);
-            onRefreshed(data.accessToken);
-            isRefreshing = false;
-
-            // Retry original request
-            headers.set('Authorization', `Bearer ${data.accessToken}`);
-            const retryRes = await fetch(url, { ...fetchConfig, headers });
-            return await parseResponse<T>(retryRes);
-          } else {
-            setAccessToken(null);
-            onRefreshed(null);
-            isRefreshing = false;
-            throw new ApiError(401, 'Session expired. Please log in again.');
-          }
-        } catch (err) {
-          isRefreshing = false;
-          onRefreshed(null);
-          setAccessToken(null);
-          throw err;
-        }
+    if (response.status === 401 && retryOn401 && !isAuthEndpoint) {
+      const newToken = await refreshAccessToken();
+      if (newToken) {
+        headers.set('Authorization', `Bearer ${newToken}`);
+        response = await fetch(url, { ...fetchConfig, headers });
+      } else {
+        notifyAuthFailure();
+        throw new ApiError(401, 'Session expired. Please log in again.');
       }
+    }
 
-      // If already refreshing, wait for subscriber
-      return new Promise<T>((resolve, reject) => {
-        addRefreshSubscriber(async (newToken) => {
-          if (!newToken) {
-            reject(new ApiError(401, 'Session expired. Please log in again.'));
-            return;
-          }
-          headers.set('Authorization', `Bearer ${newToken}`);
-          try {
-            const retryRes = await fetch(url, { ...fetchConfig, headers });
-            resolve(await parseResponse<T>(retryRes));
-          } catch (e) {
-            reject(e);
-          }
-        });
-      });
+    if (response.status === 401 && !isAuthEndpoint) {
+      notifyAuthFailure();
     }
 
     return await parseResponse<T>(response);

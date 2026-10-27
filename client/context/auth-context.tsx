@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { SafeUser, AuthResponse, RefreshResponse } from '@/types/auth';
-import { api, setAccessToken } from '@/lib/api';
+import { api, setAccessToken, refreshAccessToken, setOnAuthFailure } from '@/lib/api';
 
 interface AuthContextType {
   user: SafeUser | null;
@@ -25,12 +25,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let ignore = false;
+
+    setOnAuthFailure(() => {
+      if (!ignore) {
+        setUser(null);
+        setIsLoading(false);
+      }
+    });
+
     async function restore() {
       try {
-        const refreshData = await api.post<RefreshResponse>('/auth/refresh', {}, { retryOn401: false });
+        const token = await refreshAccessToken();
         if (!ignore) {
-          if (refreshData?.accessToken) {
-            setAccessToken(refreshData.accessToken);
+          if (token) {
             const me = await api.get<SafeUser>('/auth/me');
             if (!ignore) {
               setUser(me);
@@ -56,6 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       ignore = true;
+      setOnAuthFailure(null);
     };
   }, []);
 
@@ -79,7 +87,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setAccessToken(null);
       setUser(null);
-      router.push('/login');
+      router.replace('/login');
     }
   };
 

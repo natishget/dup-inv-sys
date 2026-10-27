@@ -89,14 +89,63 @@ export class AuthController {
     };
   }
 
-  @UseGuards(JwtAuthGuard)
+  @Public()
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   async logout(
-    @CurrentUser('id') userId: string,
+    @Req() reqOrUserId: any,
     @Res({ passthrough: true }) res: express.Response,
   ): Promise<{ message: string }> {
-    await this.authService.logout(userId);
+    let userId: string | null = typeof reqOrUserId === 'string' ? reqOrUserId : null;
+
+    if (!userId && reqOrUserId && typeof reqOrUserId === 'object') {
+      if (reqOrUserId.user?.id) {
+        userId = reqOrUserId.user.id;
+      }
+
+      if (!userId) {
+        const refreshToken = reqOrUserId.cookies?.[this.refreshCookieName];
+        if (typeof refreshToken === 'string' && refreshToken.includes('.')) {
+          try {
+            const parts = refreshToken.split('.');
+            if (parts.length === 3) {
+              const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
+              if (payload?.sub) {
+                userId = payload.sub;
+              }
+            }
+          } catch {
+            // Ignore malformed token
+          }
+        }
+      }
+
+      if (!userId) {
+        const authHeader = reqOrUserId.headers?.authorization;
+        if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
+          const token = authHeader.substring(7).trim();
+          try {
+            const parts = token.split('.');
+            if (parts.length === 3) {
+              const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
+              if (payload?.sub) {
+                userId = payload.sub;
+              }
+            }
+          } catch {
+            // Ignore malformed token
+          }
+        }
+      }
+    }
+
+    if (userId) {
+      try {
+        await this.authService.logout(userId);
+      } catch {
+        // Ignore DB update error during logout
+      }
+    }
 
     res.clearCookie(this.refreshCookieName, {
       httpOnly: true,

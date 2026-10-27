@@ -19,7 +19,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (!isLoading && isAuthenticated && user) {
-      router.push('/dashboard');
+      router.replace('/dashboard');
     }
   }, [isLoading, isAuthenticated, user, router]);
 
@@ -35,7 +35,7 @@ export default function LoginPage() {
 
     try {
       await login(email, password);
-      router.push('/dashboard');
+      router.replace('/dashboard');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Invalid credentials or connection error';
       setError(msg);
