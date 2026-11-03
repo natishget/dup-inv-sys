@@ -105,7 +105,9 @@ function AppLayoutContent({
     { name: 'Warehouses', href: '/warehouses', icon: WarehouseIcon },
     { name: 'Purchases', href: '/purchases', icon: PurchasesIcon },
     { name: 'Sales', href: '/sales', icon: ShoppingCartIcon },
-    { name: 'COGS', href: '/cogs', icon: BarChart3Icon },
+    ...(user.role === 'ADMIN' || user.role === 'AUDITOR'
+      ? [{ name: 'COGS', href: '/cogs', icon: BarChart3Icon }]
+      : []),
   ];
 
   const handleToggleSidebar = () => {

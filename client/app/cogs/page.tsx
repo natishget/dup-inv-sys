@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import { useAuth } from '@/hooks/use-auth';
 import { AppLayout } from '@/components/app-layout';
 import { api, getAccessToken } from '@/lib/api';
@@ -13,6 +14,7 @@ import {
 import {
   RefreshCwIcon,
   AlertCircleIcon,
+  SlidersIcon,
   XIcon,
 } from '@/components/icons';
 
@@ -48,7 +50,7 @@ const fmt = (val: number | string | null | undefined): string => {
 };
 
 export default function CogsPage() {
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
 
   // ─── Filter States ──────────────────────────────────────────────────────────
   const [startDate, setStartDate] = useState('');
@@ -80,7 +82,15 @@ export default function CogsPage() {
 
   // ─── 2. Fetch COGS Report ───────────────────────────────────────────────────
   const fetchReport = useCallback(async () => {
-    if (authLoading || !isAuthenticated || !startDate || !endDate) return;
+    if (
+      authLoading ||
+      !isAuthenticated ||
+      !startDate ||
+      !endDate ||
+      (user && user.role !== 'ADMIN' && user.role !== 'AUDITOR')
+    ) {
+      return;
+    }
 
     setIsLoading(true);
     setErrorMessage(null);
@@ -167,7 +177,7 @@ export default function CogsPage() {
   const meta = report?.meta || { total: 0, page: 1, limit: 10, totalPages: 1 };
 
   return (
-    <AppLayout breadcrumb="COGS">
+    <AppLayout breadcrumb="COGS" allowedRoles={['ADMIN', 'AUDITOR']}>
       <div className="space-y-6">
         {/* Error Alert */}
         {errorMessage && (
@@ -194,12 +204,23 @@ export default function CogsPage() {
             </p>
           </div>
 
-          {/* Active Method Badge */}
+          {/* Active Method Badge & Admin Switcher Link */}
           <div className="flex items-center gap-2 self-start sm:self-auto">
             <div className="inline-flex items-center px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#0a0a0c] text-xs font-medium text-zinc-700 dark:text-zinc-300 shadow-xs">
               <span className="text-zinc-400 dark:text-zinc-500 mr-1.5">Active method:</span>
               <span className="font-semibold text-zinc-900 dark:text-zinc-100">{activeMethod}</span>
             </div>
+
+            {user?.role === 'ADMIN' && (
+              <Link
+                href="/settings?tab=system"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 transition-colors shadow-xs"
+                title="Switch active corporate costing method in System Settings"
+              >
+                <SlidersIcon className="w-3.5 h-3.5" />
+                <span>Switch Method</span>
+              </Link>
+            )}
           </div>
         </div>
 
