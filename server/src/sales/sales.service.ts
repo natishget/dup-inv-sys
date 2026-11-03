@@ -3,6 +3,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
   BadRequestException,
+  Optional,
 } from '@nestjs/common';
 import {
   Prisma,
@@ -11,6 +12,7 @@ import {
   CostingMethodName,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { DashboardService } from '../dashboard/dashboard.service';
 import { CreateSaleDto } from './dto/create-sale.dto';
 import { UpdateSaleMetadataDto } from './dto/update-sale-metadata.dto';
 import { VoidTransactionDto } from './dto/void-transaction.dto';
@@ -66,7 +68,10 @@ export interface PaginatedSalesResponse {
 
 @Injectable()
 export class SalesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly dashboardService?: DashboardService,
+  ) {}
 
   // ── 1. LIST WITH FILTERS & PAGINATION ───────────────────────────────────────
 
@@ -248,56 +253,114 @@ export class SalesService {
           },
         });
 
-        // 5b. Fetch candidate cost layers for FIFO/LIFO consumption
-        const candidateLayers = await tx.inventoryCostLayer.findMany({
-          where: {
-            variantId: item.variantId,
-            warehouseId: dto.warehouseId,
-            remainingQty: { gt: 0 },
-          },
-          orderBy:
-            activeMethod === CostingMethodName.LIFO
-              ? { createdAt: 'desc' }
-              : { createdAt: 'asc' },
-        });
-
-        let remainingToConsume = Number(qty);
+        // 5b. Costing calculation & layer consumption
         let totalCostOfItem = new Prisma.Decimal(0);
 
-        for (const layer of candidateLayers) {
-          if (remainingToConsume <= 0) break;
-
-          const layerAvail = Number(layer.remainingQty ?? 0);
-          if (layerAvail <= 0) continue;
-
-          const take = Math.min(layerAvail, remainingToConsume);
-          const takeDec = new Prisma.Decimal(take);
-          const layerUnitCost = new Prisma.Decimal(layer.unitCost ?? 0);
-          const layerCostTotal = takeDec.mul(layerUnitCost).toDecimalPlaces(2);
-          totalCostOfItem = totalCostOfItem.add(layerCostTotal);
-
-          // Atomic reduction of remaining_qty
-          await tx.inventoryCostLayer.update({
-            where: { id: layer.id },
-            data: {
-              remainingQty: { decrement: takeDec },
+        if (activeMethod === CostingMethodName.WEIGHTED_AVERAGE) {
+          // Weighted Average Mode: evaluate COGS at perpetual average unit cost
+          const valuation = await tx.inventoryValuation.findUnique({
+            where: {
+              variantId_warehouseId: {
+                variantId: item.variantId,
+                warehouseId: dto.warehouseId,
+              },
             },
           });
 
-          // Permanent frozen snapshot in cogs_entries
+          const avgUnitCost = valuation?.avgUnitCost
+            ? new Prisma.Decimal(valuation.avgUnitCost)
+            : new Prisma.Decimal(0);
+          totalCostOfItem = qty.mul(avgUnitCost).toDecimalPlaces(2);
+
+          // Permanent frozen snapshot in cogs_entries (sourceLayerId = null for Weighted Average)
           await tx.cogsEntry.create({
             data: {
               saleItemId: saleItem.id,
               variantId: item.variantId,
-              quantity: takeDec,
-              unitCost: layerUnitCost,
-              totalCost: layerCostTotal,
-              costingMethod: activeMethod,
-              sourceLayerId: layer.id,
+              quantity: qty,
+              unitCost: avgUnitCost,
+              totalCost: totalCostOfItem,
+              costingMethod: CostingMethodName.WEIGHTED_AVERAGE,
+              sourceLayerId: null,
             },
           });
 
-          remainingToConsume -= take;
+          // Still decrement oldest candidate cost layers to keep physical layer stock in sync
+          const candidateLayers = await tx.inventoryCostLayer.findMany({
+            where: {
+              variantId: item.variantId,
+              warehouseId: dto.warehouseId,
+              remainingQty: { gt: 0 },
+            },
+            orderBy: { createdAt: 'asc' },
+          });
+
+          let remainingToConsume = Number(qty);
+          for (const layer of candidateLayers) {
+            if (remainingToConsume <= 0) break;
+            const layerAvail = Number(layer.remainingQty ?? 0);
+            if (layerAvail <= 0) continue;
+            const take = Math.min(layerAvail, remainingToConsume);
+            const takeDec = new Prisma.Decimal(take);
+            await tx.inventoryCostLayer.update({
+              where: { id: layer.id },
+              data: {
+                remainingQty: { decrement: takeDec },
+              },
+            });
+            remainingToConsume -= take;
+          }
+        } else {
+          // FIFO / LIFO Mode: consume candidate cost layers in sequence
+          const candidateLayers = await tx.inventoryCostLayer.findMany({
+            where: {
+              variantId: item.variantId,
+              warehouseId: dto.warehouseId,
+              remainingQty: { gt: 0 },
+            },
+            orderBy:
+              activeMethod === CostingMethodName.LIFO
+                ? { createdAt: 'desc' }
+                : { createdAt: 'asc' },
+          });
+
+          let remainingToConsume = Number(qty);
+
+          for (const layer of candidateLayers) {
+            if (remainingToConsume <= 0) break;
+
+            const layerAvail = Number(layer.remainingQty ?? 0);
+            if (layerAvail <= 0) continue;
+
+            const take = Math.min(layerAvail, remainingToConsume);
+            const takeDec = new Prisma.Decimal(take);
+            const layerUnitCost = new Prisma.Decimal(layer.unitCost ?? 0);
+            const layerCostTotal = takeDec.mul(layerUnitCost).toDecimalPlaces(2);
+            totalCostOfItem = totalCostOfItem.add(layerCostTotal);
+
+            // Atomic reduction of remaining_qty
+            await tx.inventoryCostLayer.update({
+              where: { id: layer.id },
+              data: {
+                remainingQty: { decrement: takeDec },
+              },
+            });
+
+            // Permanent frozen snapshot in cogs_entries
+            await tx.cogsEntry.create({
+              data: {
+                saleItemId: saleItem.id,
+                variantId: item.variantId,
+                quantity: takeDec,
+                unitCost: layerUnitCost,
+                totalCost: layerCostTotal,
+                costingMethod: activeMethod,
+                sourceLayerId: layer.id,
+              },
+            });
+
+            remainingToConsume -= take;
+          }
         }
 
         // 5c. Outbound negative inventory transaction (-quantity)
@@ -332,18 +395,30 @@ export class SalesService {
         if (valuation) {
           const curQty = new Prisma.Decimal(valuation.totalQuantity ?? 0);
           const curCost = new Prisma.Decimal(valuation.totalCost ?? 0);
+          const curAvg = new Prisma.Decimal(valuation.avgUnitCost ?? 0);
           const nextQty = curQty.sub(qty);
-          const nextCost = curCost.sub(totalCostOfItem);
 
           const safeQty = nextQty.greaterThan(0)
             ? nextQty
             : new Prisma.Decimal(0);
-          const safeCost = nextCost.greaterThan(0)
-            ? nextCost
-            : new Prisma.Decimal(0);
-          const nextAvg = safeQty.greaterThan(0)
-            ? safeCost.div(safeQty).toDecimalPlaces(4)
-            : new Prisma.Decimal(0);
+
+          let safeCost: Prisma.Decimal;
+          let nextAvg: Prisma.Decimal;
+
+          if (activeMethod === CostingMethodName.WEIGHTED_AVERAGE) {
+            // Outbound Flow under Weighted Average (Doc 01-04 §4):
+            // updated_total_quantity = current_total_quantity - sale_qty
+            // updated_total_cost = updated_total_quantity * avg_unit_cost
+            // avg_unit_cost remains unchanged
+            safeCost = safeQty.mul(curAvg).toDecimalPlaces(2);
+            nextAvg = curAvg;
+          } else {
+            const nextCost = curCost.sub(totalCostOfItem);
+            safeCost = nextCost.greaterThan(0) ? nextCost : new Prisma.Decimal(0);
+            nextAvg = safeQty.greaterThan(0)
+              ? safeCost.div(safeQty).toDecimalPlaces(4)
+              : new Prisma.Decimal(0);
+          }
 
           await tx.inventoryValuation.update({
             where: {
@@ -370,6 +445,7 @@ export class SalesService {
       return sale.id;
     });
 
+    this.dashboardService?.clearCache();
     return this.findOne(createdSaleId);
   }
 
@@ -550,6 +626,7 @@ export class SalesService {
       }
     });
 
+    this.dashboardService?.clearCache();
     const updated = await this.findOne(id);
     return {
       message: 'Sale voided successfully and inventory restored.',
@@ -765,6 +842,7 @@ export class SalesService {
       });
     });
 
+    this.dashboardService?.clearCache();
     const updated = await this.findOne(id);
     return {
       message: 'Customer return processed successfully and inventory restored.',

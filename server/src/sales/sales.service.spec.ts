@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { SalesService } from './sales.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { DashboardService } from '../dashboard/dashboard.service';
 import {
   NotFoundException,
   UnprocessableEntityException,
@@ -10,6 +11,7 @@ import { TransactionStatus, TransactionType, CostingMethodName, Prisma } from '@
 
 describe('SalesService', () => {
   let service: SalesService;
+  let mockDashboardService: { clearCache: jest.Mock };
 
   const mockWarehouse = {
     id: 'wh-uuid-1',
@@ -128,12 +130,20 @@ describe('SalesService', () => {
     jest.clearAllMocks();
     mockPrisma.$transaction.mockImplementation(async (cb) => cb(mockPrisma));
 
+    mockDashboardService = {
+      clearCache: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SalesService,
         {
           provide: PrismaService,
           useValue: mockPrisma,
+        },
+        {
+          provide: DashboardService,
+          useValue: mockDashboardService,
         },
       ],
     }).compile();
@@ -191,6 +201,58 @@ describe('SalesService', () => {
           data: expect.objectContaining({
             transactionType: TransactionType.SALE,
             quantity: new Prisma.Decimal(-2),
+          }),
+        }),
+      );
+      expect(mockDashboardService.clearCache).toHaveBeenCalled();
+    });
+
+    it('successfully creates a sale with Weighted Average valuation and null sourceLayerId', async () => {
+      mockPrisma.warehouse.findUnique.mockResolvedValue(mockWarehouse);
+      mockPrisma.productVariant.findMany.mockResolvedValue([mockVariant]);
+      mockPrisma.systemSetting.findFirst.mockResolvedValue({
+        costingMethod: { name: CostingMethodName.WEIGHTED_AVERAGE },
+      });
+      mockPrisma.inventoryCostLayer.findMany.mockResolvedValue([mockCostLayer]);
+      mockPrisma.sale.create.mockResolvedValue(mockSale);
+      mockPrisma.saleItem.create.mockResolvedValue(mockSaleItem);
+      mockPrisma.inventoryCostLayer.update.mockResolvedValue({});
+      mockPrisma.cogsEntry.create.mockResolvedValue({});
+      mockPrisma.inventoryTransaction.create.mockResolvedValue({});
+      mockPrisma.inventoryValuation.findUnique.mockResolvedValue({
+        totalQuantity: new Prisma.Decimal(10),
+        totalCost: new Prisma.Decimal(1100),
+        avgUnitCost: new Prisma.Decimal(110),
+      });
+      mockPrisma.inventoryValuation.update.mockResolvedValue({});
+      mockPrisma.sale.update.mockResolvedValue(mockSale);
+      mockPrisma.sale.findUnique.mockResolvedValue(mockSale);
+
+      const result = await service.createSale(
+        {
+          customerName: 'Adebe Kebede',
+          warehouseId: 'wh-uuid-1',
+          saleDate: '2026-10-26',
+          notes: 'Weighted Average Sale',
+          items: [
+            {
+              variantId: 'var-uuid-1',
+              quantity: 2,
+              sellingPrice: 5268,
+            },
+          ],
+        },
+        'user-uuid-1',
+      );
+
+      expect(result).toBeDefined();
+      expect(mockPrisma.cogsEntry.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            costingMethod: CostingMethodName.WEIGHTED_AVERAGE,
+            sourceLayerId: null,
+            unitCost: new Prisma.Decimal(110),
+            totalCost: new Prisma.Decimal(220),
           }),
         }),
       );
