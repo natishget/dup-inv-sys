@@ -2,6 +2,56 @@ import { Injectable } from '@nestjs/common';
 import { TransactionStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { QueryDashboardDto } from './dto/query-dashboard.dto';
+import { QueryFinancialsDto } from './dto/query-financials.dto';
+import { QueryTopProductsDto } from './dto/query-top-products.dto';
+
+export interface FinancialsMonthItem {
+  month: string;
+  label: string;
+  revenue: number;
+  cogs: number;
+  gross_profit: number;
+}
+
+export interface FinancialsTotals {
+  revenue: number;
+  cogs: number;
+  gross_profit: number;
+}
+
+export interface DashboardFinancialsResponse {
+  fiscal_year: number;
+  start_date: string;
+  end_date: string;
+  months: FinancialsMonthItem[];
+  totals: FinancialsTotals;
+}
+
+export interface TopProductItem {
+  variant_id: string;
+  product_name: string;
+  color: string;
+  origin: string;
+  label: string;
+  total_quantity: number;
+  revenue: number;
+}
+
+export interface DashboardTopProductsResponse {
+  fiscal_year: number;
+  start_date: string;
+  end_date: string;
+  limit: number;
+  data: TopProductItem[];
+}
+
+interface CacheEntry<T> {
+  data: T;
+  expiresAt: number;
+}
+
+// 5-minute TTL (300,000 milliseconds) as specified in Documentation/04-api-reference/02-dashboard-and-analytics-api.md
+const DASHBOARD_CACHE_TTL_MS = 5 * 60 * 1000;
 
 export interface MonthlyTrendItem {
   month: string;
@@ -51,11 +101,264 @@ export interface DashboardMetricsResponse {
 
 @Injectable()
 export class DashboardService {
+  private cache = new Map<string, CacheEntry<unknown>>();
+
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * Clears in-memory dashboard cache.
+   */
+  public clearCache(): void {
+    this.cache.clear();
+  }
+
+  private getCached<T>(key: string): T | null {
+    const entry = this.cache.get(key) as CacheEntry<T> | undefined;
+    if (!entry) return null;
+    if (Date.now() > entry.expiresAt) {
+      this.cache.delete(key);
+      return null;
+    }
+    return entry.data;
+  }
+
+  private setCached<T>(key: string, data: T, ttlMs = DASHBOARD_CACHE_TTL_MS): void {
+    this.cache.set(key, {
+      data,
+      expiresAt: Date.now() + ttlMs,
+    });
+  }
+
+  /**
+   * Calculates the active corporate fiscal year according to Ethiopian / July 1 - June 30 cycle.
+   */
+  public getCurrentFiscalYear(): number {
+    const today = new Date();
+    // July is 0-indexed month 6
+    return today.getUTCMonth() >= 6 ? today.getUTCFullYear() : today.getUTCFullYear() - 1;
+  }
+
+  /**
+   * Resolves the UTC start and end Date objects for a given corporate fiscal year (July 1 to June 30).
+   */
+  public getFiscalYearBoundaries(year: number): { startDate: Date; endDate: Date } {
+    const startDate = new Date(Date.UTC(year, 6, 1, 0, 0, 0, 0));
+    const endDate = new Date(Date.UTC(year + 1, 5, 30, 23, 59, 59, 999));
+    return { startDate, endDate };
+  }
+
+  /**
+   * GET /dashboard/financials
+   * Returns annual corporate financial totals and a 12-month calendar breakdown
+   * for a specified corporate fiscal year (July 1 to June 30).
+   * Cached in memory for 5 minutes.
+   */
+  async getFinancials(query: QueryFinancialsDto): Promise<DashboardFinancialsResponse> {
+    const fiscalYear = query.fiscal_year ?? this.getCurrentFiscalYear();
+    const cacheKey = `dashboard.financials.${fiscalYear}`;
+
+    const cached = this.getCached<DashboardFinancialsResponse>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    const { startDate, endDate } = this.getFiscalYearBoundaries(fiscalYear);
+
+    // Query posted sales with items and COGS entries for accurate revenue and COGS aggregation
+    const postedSales = await this.prisma.sale.findMany({
+      where: {
+        status: TransactionStatus.POSTED,
+        saleDate: { gte: startDate, lte: endDate },
+      },
+      include: {
+        items: {
+          include: {
+            cogsEntries: true,
+          },
+        },
+      },
+      orderBy: { saleDate: 'asc' },
+    });
+
+    const monthSequence = [
+      { year: fiscalYear, monthIndex: 6, label: `Jul ${fiscalYear}`, monthStr: `${fiscalYear}-07` },
+      { year: fiscalYear, monthIndex: 7, label: `Aug ${fiscalYear}`, monthStr: `${fiscalYear}-08` },
+      { year: fiscalYear, monthIndex: 8, label: `Sep ${fiscalYear}`, monthStr: `${fiscalYear}-09` },
+      { year: fiscalYear, monthIndex: 9, label: `Oct ${fiscalYear}`, monthStr: `${fiscalYear}-10` },
+      { year: fiscalYear, monthIndex: 10, label: `Nov ${fiscalYear}`, monthStr: `${fiscalYear}-11` },
+      { year: fiscalYear, monthIndex: 11, label: `Dec ${fiscalYear}`, monthStr: `${fiscalYear}-12` },
+      { year: fiscalYear + 1, monthIndex: 0, label: `Jan ${fiscalYear + 1}`, monthStr: `${fiscalYear + 1}-01` },
+      { year: fiscalYear + 1, monthIndex: 1, label: `Feb ${fiscalYear + 1}`, monthStr: `${fiscalYear + 1}-02` },
+      { year: fiscalYear + 1, monthIndex: 2, label: `Mar ${fiscalYear + 1}`, monthStr: `${fiscalYear + 1}-03` },
+      { year: fiscalYear + 1, monthIndex: 3, label: `Apr ${fiscalYear + 1}`, monthStr: `${fiscalYear + 1}-04` },
+      { year: fiscalYear + 1, monthIndex: 4, label: `May ${fiscalYear + 1}`, monthStr: `${fiscalYear + 1}-05` },
+      { year: fiscalYear + 1, monthIndex: 5, label: `Jun ${fiscalYear + 1}`, monthStr: `${fiscalYear + 1}-06` },
+    ];
+
+    let totalRevenue = 0;
+    let totalCogs = 0;
+
+    const months: FinancialsMonthItem[] = monthSequence.map((seq) => {
+      let monthlyRevenue = 0;
+      let monthlyCogs = 0;
+
+      for (const sale of postedSales) {
+        if (!sale.saleDate) continue;
+        const d = new Date(sale.saleDate);
+        if (
+          d.getUTCFullYear() === seq.year &&
+          d.getUTCMonth() === seq.monthIndex
+        ) {
+          monthlyRevenue += Number(sale.totalAmount ?? 0);
+          for (const item of sale.items) {
+            for (const cogs of item.cogsEntries) {
+              monthlyCogs += Number(cogs.totalCost ?? 0);
+            }
+          }
+        }
+      }
+
+      const roundedRevenue = Math.round(monthlyRevenue * 100) / 100;
+      const roundedCogs = Math.round(monthlyCogs * 100) / 100;
+      const roundedGrossProfit = Math.round((roundedRevenue - roundedCogs) * 100) / 100;
+
+      totalRevenue += roundedRevenue;
+      totalCogs += roundedCogs;
+
+      return {
+        month: seq.monthStr,
+        label: seq.label,
+        revenue: roundedRevenue,
+        cogs: roundedCogs,
+        gross_profit: roundedGrossProfit,
+      };
+    });
+
+    const totals: FinancialsTotals = {
+      revenue: Math.round(totalRevenue * 100) / 100,
+      cogs: Math.round(totalCogs * 100) / 100,
+      gross_profit: Math.round((totalRevenue - totalCogs) * 100) / 100,
+    };
+
+    const response: DashboardFinancialsResponse = {
+      fiscal_year: fiscalYear,
+      start_date: startDate.toISOString().slice(0, 10),
+      end_date: endDate.toISOString().slice(0, 10),
+      months,
+      totals,
+    };
+
+    this.setCached(cacheKey, response);
+    return response;
+  }
+
+  /**
+   * GET /dashboard/top-products
+   * Returns highest-volume product variants sold during a corporate fiscal year, ranked by total units dispatched.
+   * Cached in memory for 5 minutes.
+   */
+  async getTopProducts(query: QueryTopProductsDto): Promise<DashboardTopProductsResponse> {
+    const fiscalYear = query.fiscal_year ?? this.getCurrentFiscalYear();
+    const limit = Math.min(Math.max(query.limit ?? 10, 1), 15);
+    const cacheKey = `dashboard.top-products.${fiscalYear}.${limit}`;
+
+    const cached = this.getCached<DashboardTopProductsResponse>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    const { startDate, endDate } = this.getFiscalYearBoundaries(fiscalYear);
+
+    // Query posted sale items for the fiscal period
+    const saleItems = await this.prisma.saleItem.findMany({
+      where: {
+        sale: {
+          status: TransactionStatus.POSTED,
+          saleDate: { gte: startDate, lte: endDate },
+        },
+      },
+      include: {
+        variant: {
+          include: {
+            product: true,
+          },
+        },
+      },
+    });
+
+    const aggregateMap = new Map<
+      string,
+      {
+        variant_id: string;
+        product_name: string;
+        color: string;
+        origin: string;
+        label: string;
+        total_quantity: number;
+        revenue: number;
+      }
+    >();
+
+    for (const item of saleItems) {
+      if (!item.variantId || !item.variant) continue;
+      const v = item.variant;
+      const qty = Number(item.quantity ?? 0);
+      const rev = Number(item.totalPrice ?? 0);
+
+      const existing = aggregateMap.get(item.variantId);
+      if (existing) {
+        existing.total_quantity += qty;
+        existing.revenue += rev;
+      } else {
+        const productName = v.product?.name ?? 'Unknown Product';
+        const color = v.color ?? 'Standard';
+        const origin = v.origin ?? 'LOCAL';
+        const originDisplay = origin.toUpperCase() === 'IMPORTED' ? 'Imported' : 'Local';
+        const label = `${productName} - ${color} - ${originDisplay}`;
+
+        aggregateMap.set(item.variantId, {
+          variant_id: item.variantId,
+          product_name: productName,
+          color,
+          origin,
+          label,
+          total_quantity: qty,
+          revenue: rev,
+        });
+      }
+    }
+
+    const sorted = Array.from(aggregateMap.values())
+      .sort((a, b) => b.total_quantity - a.total_quantity || b.revenue - a.revenue)
+      .slice(0, limit)
+      .map((item) => ({
+        ...item,
+        total_quantity: Math.round(item.total_quantity * 10000) / 10000,
+        revenue: Math.round(item.revenue * 100) / 100,
+      }));
+
+    const response: DashboardTopProductsResponse = {
+      fiscal_year: fiscalYear,
+      start_date: startDate.toISOString().slice(0, 10),
+      end_date: endDate.toISOString().slice(0, 10),
+      limit,
+      data: sorted,
+    };
+
+    this.setCached(cacheKey, response);
+    return response;
+  }
+
   async getMetrics(query: QueryDashboardDto): Promise<DashboardMetricsResponse> {
+    const limit = Math.min(Math.max(query.limit ?? 12, 1), 15);
     const { fiscalYear, startDate, endDate, monthDefinitions } =
       this.resolveFiscalPeriod(query);
+
+    const cacheKey = `dashboard.metrics.${fiscalYear}.${query.startDate || ''}.${query.endDate || ''}.${limit}`;
+    const cached = this.getCached<DashboardMetricsResponse>(cacheKey);
+    if (cached) {
+      return cached;
+    }
 
     // Build date filters for posted sales and purchases
     const dateFilterSales =
@@ -228,7 +531,7 @@ export class DashboardService {
       };
     });
 
-    // 6. Top Variants Ranking
+    // 6. Top Variants Ranking (Configurable limit: default 12, max 15 per Doc 05-02 §4.1)
     const topVariants: TopVariantItem[] = Array.from(
       variantSalesMap.values(),
     )
@@ -248,9 +551,9 @@ export class DashboardService {
         };
       })
       .sort((a, b) => b.unitsSold - a.unitsSold || b.revenue - a.revenue)
-      .slice(0, 5);
+      .slice(0, limit);
 
-    return {
+    const result: DashboardMetricsResponse = {
       fiscalYear,
       startDate: startDate ? startDate.toISOString().slice(0, 10) : null,
       endDate: endDate ? endDate.toISOString().slice(0, 10) : null,
@@ -270,6 +573,9 @@ export class DashboardService {
       monthlyTrend,
       topVariants,
     };
+
+    this.setCached(cacheKey, result);
+    return result;
   }
 
   /**
