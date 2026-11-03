@@ -3,9 +3,11 @@ import {
   NotFoundException,
   UnprocessableEntityException,
   BadRequestException,
+  Optional,
 } from '@nestjs/common';
 import { Prisma, TransactionStatus, TransactionType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { DashboardService } from '../dashboard/dashboard.service';
 import { CreatePurchaseDto } from './dto/create-purchase.dto';
 import { UpdatePurchaseMetadataDto } from './dto/update-purchase-metadata.dto';
 import { VoidTransactionDto } from './dto/void-transaction.dto';
@@ -66,7 +68,10 @@ const ITEM_INCLUDE = {
 
 @Injectable()
 export class PurchasesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly dashboardService?: DashboardService,
+  ) {}
 
   // ── 1. LIST ─────────────────────────────────────────────────────────────────
 
@@ -278,6 +283,7 @@ export class PurchasesService {
       });
     });
 
+    this.dashboardService?.clearCache();
     return {
       data: purchase as unknown as PurchaseWithItems,
       message: 'Purchase created successfully.',
@@ -471,6 +477,7 @@ export class PurchasesService {
       include: { items: { include: ITEM_INCLUDE } },
     });
 
+    this.dashboardService?.clearCache();
     return {
       data: voided as unknown as PurchaseWithItems,
       message: 'Purchase voided successfully.',
@@ -645,6 +652,7 @@ export class PurchasesService {
       });
     });
 
+    this.dashboardService?.clearCache();
     return { message: 'Purchase return processed successfully.' };
   }
 }
