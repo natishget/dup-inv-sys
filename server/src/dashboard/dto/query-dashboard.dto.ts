@@ -1,4 +1,5 @@
-import { IsOptional, IsString } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class QueryDashboardDto {
   @IsOptional()
@@ -12,4 +13,11 @@ export class QueryDashboardDto {
   @IsOptional()
   @IsString()
   endDate?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(15)
+  limit?: number;
 }
