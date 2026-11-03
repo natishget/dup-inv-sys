@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AppLayout } from '@/components/app-layout';
 import { useAuth } from '@/hooks/use-auth';
 import { api } from '@/lib/api';
@@ -18,6 +18,10 @@ import {
   AlertCircleIcon,
 } from '@/components/icons';
 
+// ─── Module-Level Client-Side Memory Caching (Map) ──────────────────────────
+// Doc 05-02 §4.2: Retains cached responses across tab switches & fiscal year selections (0ms)
+const requestCache = new Map<string, DashboardMetricsResponse>();
+
 export default function DashboardPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [selectedFiscalYear, setSelectedFiscalYear] = useState('FY 2026 / 2027');
@@ -29,6 +33,13 @@ export default function DashboardPage() {
   const [hoveredMonthIndex, setHoveredMonthIndex] = useState<number | null>(null);
 
   const fetchDashboardData = useCallback(async (isManualRefresh = false) => {
+    // Check client-side memory cache on navigation / year change (0ms instantaneous switch)
+    if (!isManualRefresh && requestCache.has(selectedFiscalYear)) {
+      setData(requestCache.get(selectedFiscalYear)!);
+      setIsLoading(false);
+      return;
+    }
+
     if (isManualRefresh) {
       setIsRefreshing(true);
     } else {
@@ -38,8 +49,9 @@ export default function DashboardPage() {
 
     try {
       const res = await api.get<DashboardMetricsResponse>(
-        `/dashboard/metrics?fiscalYear=${encodeURIComponent(selectedFiscalYear)}`,
+        `/dashboard/metrics?fiscalYear=${encodeURIComponent(selectedFiscalYear)}&limit=12`,
       );
+      requestCache.set(selectedFiscalYear, res);
       setData(res);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to load dashboard metrics.';
@@ -55,7 +67,14 @@ export default function DashboardPage() {
     fetchDashboardData(false);
   }, [authLoading, isAuthenticated, fetchDashboardData]);
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
+    // Invalidate client-side cache and invoke server cache bust simultaneously
+    requestCache.clear();
+    try {
+      await api.post('/dashboard/clear-cache', {});
+    } catch {
+      // Continue refreshing even if network fails for cache-bust
+    }
     fetchDashboardData(true);
   };
 
@@ -590,7 +609,7 @@ export default function DashboardPage() {
                   </span>
                 </div>
               ) : (
-                <div className="space-y-3 mt-3">
+                <div className="space-y-3 mt-3 max-h-[460px] overflow-y-auto pr-1">
                   {data.topVariants.map((v, idx) => {
                     const topSellerUnits = data.topVariants[0]?.unitsSold || 1;
                     const pct = Math.round((v.unitsSold / topSellerUnits) * 100);

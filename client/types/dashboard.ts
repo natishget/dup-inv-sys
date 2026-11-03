@@ -1,3 +1,41 @@
+export interface DashboardFinancialMonth {
+  month: string;
+  label: string;
+  revenue: number;
+  cogs: number;
+  gross_profit: number;
+}
+
+export interface DashboardFinancialsResponse {
+  fiscal_year: number;
+  start_date: string;
+  end_date: string;
+  months: DashboardFinancialMonth[];
+  totals: {
+    revenue: number;
+    cogs: number;
+    gross_profit: number;
+  };
+}
+
+export interface TopProductItem {
+  variant_id: string;
+  product_name: string;
+  color: string;
+  origin: string;
+  label: string;
+  total_quantity: number;
+  revenue: number;
+}
+
+export interface DashboardTopProductsResponse {
+  fiscal_year: number;
+  start_date: string;
+  end_date: string;
+  limit: number;
+  data: TopProductItem[];
+}
+
 export interface MonthlyTrendItem {
   month: string;
   shortMonth: string;
