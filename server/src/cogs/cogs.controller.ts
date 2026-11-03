@@ -24,16 +24,16 @@ export class CogsController {
    * GET /cogs/report & GET /cogs
    * Generates P&L valuation report with revenue, COGS, gross profit, and margins.
    * Supports active stored mode as well as dynamic simulation (FIFO, LIFO, Weighted Average).
-   * Required Role: ADMIN, SALES, AUDITOR.
+   * Required Role: ADMIN, AUDITOR (SALES is strictly prohibited).
    */
   @Get('report')
-  @Roles(UserRole.ADMIN, UserRole.SALES, UserRole.AUDITOR)
+  @Roles(UserRole.ADMIN, UserRole.AUDITOR)
   async getReport(@Query() query: QueryCogsDto) {
     return this.cogsService.generateReport(query);
   }
 
   @Get()
-  @Roles(UserRole.ADMIN, UserRole.SALES, UserRole.AUDITOR)
+  @Roles(UserRole.ADMIN, UserRole.AUDITOR)
   async getReportAlias(@Query() query: QueryCogsDto) {
     return this.cogsService.generateReport(query);
   }
@@ -41,10 +41,10 @@ export class CogsController {
   /**
    * GET /cogs/export-csv
    * Streams a downloadable CSV spreadsheet matching the report filters.
-   * Required Role: ADMIN, SALES, AUDITOR.
+   * Required Role: ADMIN, AUDITOR (SALES is strictly prohibited).
    */
   @Get('export-csv')
-  @Roles(UserRole.ADMIN, UserRole.SALES, UserRole.AUDITOR)
+  @Roles(UserRole.ADMIN, UserRole.AUDITOR)
   @HttpCode(HttpStatus.OK)
   async exportCsv(@Query() query: QueryCogsDto, @Res() res: Response) {
     const { filename, csv } = await this.cogsService.exportCsv(query);
